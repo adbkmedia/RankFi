@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 const topPicks = [
   {
     name: 'Kraken PRO',
@@ -20,6 +22,8 @@ const topPicks = [
 ];
 
 export default function TopPicksSection() {
+  const [showTooltip, setShowTooltip] = useState(false);
+
   return (
     <div className="relative py-12">
       {/* Background Image - Full Section */}
@@ -37,7 +41,28 @@ export default function TopPicksSection() {
       <div className="max-w-7xl mx-auto px-4 relative z-10">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
-          <h2 className="text-xl font-normal text-gray-500">Top Picks</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-normal text-gray-500">Top Picks</h2>
+            {/* Tooltip Icon */}
+            <div className="relative">
+              <button
+                onMouseEnter={() => setShowTooltip(true)}
+                onMouseLeave={() => setShowTooltip(false)}
+                className="w-4 h-4 rounded-full bg-gray-400 text-white text-xs flex items-center justify-center hover:bg-gray-500 transition-colors cursor-help"
+                aria-label="Top Picks information"
+              >
+                ?
+              </button>
+              {/* Tooltip */}
+              {showTooltip && (
+                <div className="absolute left-0 top-6 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-xl z-50">
+                  <p>Based on 2450 data points below. See our methodology.</p>
+                  {/* Tooltip Arrow */}
+                  <div className="absolute -top-1 left-2 w-2 h-2 bg-gray-900 rotate-45"></div>
+                </div>
+              )}
+            </div>
+          </div>
           <a
             href="#"
             className="text-[#00a38f] hover:underline text-sm"
