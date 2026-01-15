@@ -1,106 +1,98 @@
 'use client';
 
 import { useState } from 'react';
+import { Exchange } from '../types/exchange';
+import { exchanges } from '../data/exchanges';
+import { formatCellValue, getPlaceholderColor } from '../utils/tableHelpers';
 
-// Sample exchange data
-const exchanges = [
-  {
-    name: 'Binance',
-    security: 'High',
-    features: 'Advanced',
-    fees: '0.1%',
-    supportedCoins: 350,
-    region: 'Global',
-  },
-  {
-    name: 'Coinbase',
-    security: 'Very High',
-    features: 'Basic',
-    fees: '0.5%',
-    supportedCoins: 200,
-    region: 'US, Europe',
-  },
-  {
-    name: 'Kraken',
-    security: 'High',
-    features: 'Advanced',
-    fees: '0.16%',
-    supportedCoins: 180,
-    region: 'Global',
-  },
-  {
-    name: 'Gemini',
-    security: 'Very High',
-    features: 'Basic',
-    fees: '0.5%',
-    supportedCoins: 100,
-    region: 'US',
-  },
-];
+type FilterType = 'features' | 'fees' | 'security';
 
-type FilterType = 'all' | 'security' | 'features' | 'fees';
+// Column definitions matching your live site
+const columnDefinitions = {
+  features: [
+    { key: 'app_name', label: 'Name' },
+    { key: 'coins', label: '# of Coins' },
+    { key: 'number_of_futures', label: '# of Futures' },
+    { key: 'max_leverage', label: 'Max Leverage' },
+    { key: 'fiat_currencies', label: 'Fiat Currencies' },
+    { key: 'margin_spot', label: 'Max Margin (spot)' },
+    { key: 'copy_trading', label: 'Copy Trading' },
+    { key: 'trading_bots', label: 'Trading Bots' },
+    { key: 'p2p_trading', label: 'P2P Trading' },
+    { key: 'staking_or_earn', label: 'Staking or Earn' },
+    { key: 'mobile_app', label: 'Mobile App' },
+    { key: '247_support', label: '24/7 Support' },
+  ],
+  fees: [
+    { key: 'app_name', label: 'Name' },
+    { key: 'maker_fee', label: 'Maker Fee' },
+    { key: 'taker_fee', label: 'Taker Fee' },
+    { key: 'futures_maker_fee', label: 'Futures Maker Fee' },
+    { key: 'futures_taker_fee', label: 'Futures Taker Fee' },
+    { key: 'rankfi_discount', label: 'RankFi Discount' },
+    { key: 'rankfi_bonus', label: 'RankFi Bonus' },
+  ],
+  security: [
+    { key: 'app_name', label: 'Name' },
+    { key: 'founded', label: 'Founded' },
+    { key: 'number_of_users', label: '# of Users' },
+    { key: 'proof_of_reserves', label: 'Proof of Reserves' },
+    { key: 'uses_cold_storage', label: 'Uses Cold Storage' },
+    { key: 'insurance_policy', label: 'Insurance Policy' },
+    { key: 'hacks_or_incidents', label: 'Hacks' },
+    { key: 'other_incidents', label: 'Other Incidents' },
+    { key: '2fa', label: '2FA' },
+    { key: 'kyc', label: 'KYC' },
+    { key: 'publicly_traded', label: 'Publicly Traded' },
+    { key: 'headquarters', label: 'Headquarters' },
+  ],
+};
 
-export default function ComparisonTable() {
-  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
-
-  const filters = [
-    { id: 'all' as FilterType, label: 'All' },
-    { id: 'security' as FilterType, label: 'Security' },
-    { id: 'features' as FilterType, label: 'Features' },
-    { id: 'fees' as FilterType, label: 'Fees' },
-  ];
-
-  // Columns to show based on filter
-  const getColumns = () => {
-    switch (activeFilter) {
-      case 'security':
-        return ['Exchange', 'Security', 'Region'];
-      case 'features':
-        return ['Exchange', 'Features', 'Supported Coins'];
-      case 'fees':
-        return ['Exchange', 'Trading Fees', 'Region'];
-      default:
-        return ['Exchange', 'Security', 'Features', 'Fees', 'Supported Coins', 'Region'];
-    }
-  };
-
-  const getRowData = (exchange: typeof exchanges[0]) => {
-    switch (activeFilter) {
-      case 'security':
-        return [exchange.name, exchange.security, exchange.region];
-      case 'features':
-        return [exchange.name, exchange.features, exchange.supportedCoins.toString()];
-      case 'fees':
-        return [exchange.name, exchange.fees, exchange.region];
-      default:
-        return [
-          exchange.name,
-          exchange.security,
-          exchange.features,
-          exchange.fees,
-          exchange.supportedCoins.toString(),
-          exchange.region,
-        ];
-    }
-  };
+// Helper to render name cell with logo
+const renderNameCell = (exchange: Exchange) => {
+  const placeholderColor = getPlaceholderColor(exchange.app_name);
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Cryptocurrency Exchange Comparison</h1>
-        <p className="text-gray-600">Compare the top cryptocurrency exchanges</p>
-      </div>
+    <div className="flex items-center">
+      {/* Placeholder logo - will be replaced with actual images later */}
+      <div
+        className="w-5 h-5 rounded mr-2 shrink-0"
+        style={{ backgroundColor: placeholderColor }}
+      />
+      <a
+        href={`/cex/${exchange.app_name.toLowerCase().replace(/\s+/g, '-')}/`}
+        className="text-black font-bold hover:underline"
+      >
+        {exchange.app_name}
+      </a>
+    </div>
+  );
+};
+
+export default function ComparisonTable() {
+  const [activeFilter, setActiveFilter] = useState<FilterType>('features');
+
+  const filters = [
+    { id: 'features' as FilterType, label: 'Features' },
+    { id: 'fees' as FilterType, label: 'Fees' },
+    { id: 'security' as FilterType, label: 'Security' },
+  ];
+
+  const columns = columnDefinitions[activeFilter];
+
+  return (
+    <div className="w-full max-w-7xl mx-auto px-4 py-4 bg-white">
 
       {/* Filter Buttons */}
-      <div className="flex flex-wrap gap-3 mb-6">
+      <div className="flex flex-wrap gap-2 mb-4">
         {filters.map((filter) => (
           <button
             key={filter.id}
             onClick={() => setActiveFilter(filter.id)}
-            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+            className={`px-5 py-2 rounded-full text-[13px] font-normal transition-colors cursor-pointer ${
               activeFilter === filter.id
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-[#2d2d2d] text-white'
+                : 'bg-[#f0f0f0] text-black hover:bg-[#e0e0e0]'
             }`}
           >
             {filter.label}
@@ -109,75 +101,61 @@ export default function ComparisonTable() {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto bg-white rounded-lg shadow-sm border border-gray-200">
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              {getColumns().map((column) => (
+      <div className="overflow-x-auto bg-white rounded border border-[#eaeaea]">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-gray-50">
+              {columns.map((column) => (
                 <th
-                  key={column}
-                  className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider"
+                  key={column.key}
+                  className="px-2 py-3 h-12 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-[#eaeaea]"
+                  style={{ height: '48px' }}
                 >
-                  {column}
+                  {column.key === 'app_name' ? (
+                    <div className="text-left">{column.label}</div>
+                  ) : (
+                    <div className="text-center">{column.label}</div>
+                  )}
                 </th>
               ))}
+              <th
+                className="px-2 py-3 h-12 text-xs font-semibold text-gray-700 uppercase tracking-wider border border-[#eaeaea] text-center"
+                style={{ height: '48px' }}
+              >
+                Website
+              </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody>
             {exchanges.map((exchange, idx) => (
-              <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                {getRowData(exchange).map((cell, cellIdx) => (
-                  <td key={cellIdx} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {cell}
+              <tr key={idx} className="bg-white hover:bg-[#f0f0f0] transition-colors border-b border-[#eaeaea]">
+                {columns.map((column) => (
+                  <td
+                    key={column.key}
+                    className="px-2 py-1.5 whitespace-nowrap text-[13px] text-gray-900 border border-[#eaeaea]"
+                  >
+                    {column.key === 'app_name' ? (
+                      <div className="text-left">{renderNameCell(exchange)}</div>
+                    ) : (
+                      <div className="text-center">{formatCellValue(exchange[column.key as keyof Exchange])}</div>
+                    )}
                   </td>
                 ))}
+                <td className="px-2 py-1.5 whitespace-nowrap text-[13px] text-gray-900 border border-[#eaeaea] text-center">
+                  <a
+                    href={exchange.website || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#00a38f] hover:underline"
+                  >
+                    Visit →
+                  </a>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-
-      {/* Mobile-friendly card view (shows on small screens) */}
-      <div className="md:hidden mt-6 space-y-4">
-        {exchanges.map((exchange, idx) => (
-          <div key={idx} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <h3 className="font-semibold text-lg text-gray-900 mb-3">{exchange.name}</h3>
-            <div className="space-y-2">
-              {activeFilter === 'all' || activeFilter === 'security' ? (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Security:</span>
-                  <span className="font-medium">{exchange.security}</span>
-                </div>
-              ) : null}
-              {activeFilter === 'all' || activeFilter === 'features' ? (
-                <>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Features:</span>
-                    <span className="font-medium">{exchange.features}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Supported Coins:</span>
-                    <span className="font-medium">{exchange.supportedCoins}</span>
-                  </div>
-                </>
-              ) : null}
-              {activeFilter === 'all' || activeFilter === 'fees' ? (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Trading Fees:</span>
-                  <span className="font-medium">{exchange.fees}</span>
-                </div>
-              ) : null}
-              {activeFilter === 'all' || activeFilter === 'security' || activeFilter === 'fees' ? (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Region:</span>
-                  <span className="font-medium">{exchange.region}</span>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
-

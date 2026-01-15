@@ -1,11 +1,6 @@
-import ComparisonTable from './components/ComparisonTable';
+import { redirect } from 'next/navigation';
 
+// Redirect root to best-crypto-exchanges
 export default function Home() {
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <main className="py-8">
-        <ComparisonTable />
-      </main>
-    </div>
-  );
+  redirect('/best-crypto-exchanges');
 }
