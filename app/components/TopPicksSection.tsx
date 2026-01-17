@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import Tooltip from './Tooltip';
 
 const topPicks = [
   {
@@ -22,10 +22,8 @@ const topPicks = [
 ];
 
 export default function TopPicksSection() {
-  const [showTooltip, setShowTooltip] = useState(false);
-
   return (
-    <div className="relative py-12">
+    <div className="relative py-7">
       {/* Background Image - Full Section */}
       <div 
         className="absolute inset-0 z-0"
@@ -40,39 +38,42 @@ export default function TopPicksSection() {
       {/* Content Container */}
       <div className="max-w-7xl mx-auto px-4 relative z-10">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-2">
-            <h2 className="text-xl font-normal text-gray-500">Top Picks</h2>
-            {/* Tooltip Icon */}
-            <div className="relative">
+            <h2 className="text-md font-normal text-gray-500">Top Picks</h2>
+            <Tooltip
+              content="Based on 2,450 data points below."
+              linkText="See our methodology"
+              linkUrl="/methodology"
+              position="top"
+              align="left"
+            >
               <button
-                onMouseEnter={() => setShowTooltip(true)}
-                onMouseLeave={() => setShowTooltip(false)}
-                className="w-4 h-4 rounded-full bg-gray-400 text-white text-xs flex items-center justify-center hover:bg-gray-500 transition-colors cursor-help"
+                className="w-3.5 h-3.5 rounded-full bg-gray-400 text-white text-xs flex items-center justify-center hover:bg-gray-500 transition-colors cursor-help"
                 aria-label="Top Picks information"
               >
                 ?
               </button>
-              {/* Tooltip */}
-              {showTooltip && (
-                <div className="absolute left-0 top-6 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-xl z-50">
-                  <p>Based on 2450 data points below. See our methodology.</p>
-                  {/* Tooltip Arrow */}
-                  <div className="absolute -top-1 left-2 w-2 h-2 bg-gray-900 rotate-45"></div>
-                </div>
-              )}
-            </div>
+            </Tooltip>
           </div>
-          <a
-            href="#"
-            className="text-[#00a38f] hover:underline text-sm"
+          <Tooltip
+            content="RankFi earns revenue through affiliate partnerships. This does not affect our data or recommendations."
+            linkText="View Disclosure Policy"
+            linkUrl="/terms-of-service/"
+            position="top"
+            align="right"
           >
-            Affiliate Disclosure
-          </a>
+            <a
+              href="/terms-of-service/"
+              className="text-[#00a38f] hover:underline text-sm"
+            >
+              Affiliate Disclosure
+            </a>
+          </Tooltip>
         </div>
 
         {/* Exchange Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {topPicks.map((exchange, idx) => (
             <div
               key={idx}

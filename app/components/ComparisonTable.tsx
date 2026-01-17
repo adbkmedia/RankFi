@@ -7,6 +7,30 @@ import { formatCellValue, getPlaceholderColor, getSortComparison } from '../util
 
 type FilterType = 'features' | 'fees' | 'security';
 
+// Rank assignment function - placeholder ranks
+const getExchangeRank = (exchangeName: string): number => {
+  const rankMap: Record<string, number> = {
+    'Kraken Pro': 1,
+    'Binance': 2,
+    'AscendEx': 3,
+  };
+  
+  // If exchange has a specific rank, return it
+  if (rankMap[exchangeName]) {
+    return rankMap[exchangeName];
+  }
+  
+  // For other exchanges, assign sequential ranks starting from 4
+  // We'll use a simple hash-based approach to assign consistent ranks
+  const allExchanges = exchanges.map(e => e.app_name);
+  const rankedExchanges = ['Kraken Pro', 'Binance', 'AscendEx'];
+  const unrankedExchanges = allExchanges.filter(name => !rankedExchanges.includes(name));
+  
+  // Find index in unranked list and add 4
+  const index = unrankedExchanges.indexOf(exchangeName);
+  return index >= 0 ? index + 4 : 999; // Default to 999 if not found
+};
+
 // Column definitions matching your live site
 const columnDefinitions = {
   features: [
@@ -77,7 +101,7 @@ type SortState = {
 export default function ComparisonTable() {
   const [activeFilter, setActiveFilter] = useState<FilterType>('features');
   const [sortState, setSortState] = useState<SortState>({
-    column: 'app_name',
+    column: 'rank',
     direction: 'asc',
   });
   const [currentPage, setCurrentPage] = useState(1);
@@ -137,6 +161,15 @@ export default function ComparisonTable() {
 
   // Sort exchanges based on current sort state
   const sortedExchanges = useMemo(() => {
+    // Handle rank sorting separately
+    if (sortState.column === 'rank') {
+      const directionMultiplier = sortState.direction === 'asc' ? 1 : -1;
+      return [...exchanges].sort((a, b) => {
+        const rankA = getExchangeRank(a.app_name);
+        const rankB = getExchangeRank(b.app_name);
+        return directionMultiplier * (rankA - rankB);
+      });
+    }
     const sortComparison = getSortComparison(sortState.column, sortState.direction);
     return [...exchanges].sort(sortComparison);
   }, [sortState]);
@@ -263,12 +296,12 @@ export default function ComparisonTable() {
 
       {/* Filter Buttons and Compare */}
       <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-3">
           {filters.map((filter) => (
             <button
               key={filter.id}
               onClick={() => handleFilterChange(filter.id)}
-              className={`px-5 py-2 rounded-full text-[13px] font-normal transition-colors cursor-pointer ${
+              className={`px-5 py-2 rounded-lg text-[13px] font-normal transition-colors cursor-pointer ${
                 activeFilter === filter.id
                   ? 'bg-[#2d2d2d] text-white'
                   : 'bg-[#f0f0f0] text-black hover:bg-[#e0e0e0]'
@@ -283,7 +316,7 @@ export default function ComparisonTable() {
         <div className="relative" ref={compareDropdownRef}>
           <button
             onClick={handleCompareButtonClick}
-            className={`px-5 py-2 rounded-full text-[13px] font-normal transition-colors cursor-pointer flex items-center gap-2 ${
+            className={`px-5 py-2 rounded-lg text-[13px] font-normal transition-colors cursor-pointer flex items-center gap-2 ${
               comparisonApplied
                 ? 'bg-[#2d2d2d] text-white'
                 : 'bg-[#f0f0f0] text-black hover:bg-[#e0e0e0]'
@@ -363,6 +396,27 @@ export default function ComparisonTable() {
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-[#2d2d2d]">
+              {/* Rank Column Header */}
+              <th
+                onClick={() => handleSort('rank')}
+                className="text-xs font-semibold text-white tracking-wider border-t border-b border-l border-[#eaeaea] cursor-pointer hover:bg-[#3a3a3a] transition-colors relative sticky left-0 z-30 bg-[#2d2d2d] px-1 py-3 text-center"
+                style={{
+                  height: '48px',
+                  width: '40px',
+                  minWidth: '40px',
+                  maxWidth: '40px',
+                  boxShadow: '2px 0 8px 0 rgba(0,0,0,0.15)',
+                }}
+              >
+                <div className="flex items-center justify-center">
+                  <span>#</span>
+                  {sortState.column === 'rank' && (
+                    <span className="ml-0.5 text-[10px]">
+                      {sortState.direction === 'asc' ? '▲' : '▼'}
+                    </span>
+                  )}
+                </div>
+              </th>
               {columns.map((column) => {
                 const isSorted = sortState.column === column.key;
                 const isAsc = sortState.direction === 'asc';
@@ -373,7 +427,7 @@ export default function ComparisonTable() {
                     onClick={() => handleSort(column.key)}
                     className={`text-xs font-semibold text-white tracking-wider border border-[#eaeaea] cursor-pointer hover:bg-[#3a3a3a] transition-colors relative ${
                       isFirstColumn
-                        ? 'sticky left-0 z-20 bg-[#2d2d2d] px-2 py-3'
+                        ? 'sticky left-[40px] z-20 bg-[#2d2d2d] px-2 py-3'
                         : 'px-2 py-3'
                     }`}
                     style={{
@@ -408,6 +462,19 @@ export default function ComparisonTable() {
           <tbody>
             {paginatedExchanges.map((exchange, idx) => (
               <tr key={idx} className="group bg-white hover:bg-[#f0f0f0] transition-colors duration-75 border-b border-[#eaeaea]">
+                {/* Rank Column Cell */}
+                <td
+                  className="sticky left-0 z-20 bg-white group-hover:!bg-[#f0f0f0] px-1 py-1.5 whitespace-nowrap text-[13px] border-t border-b border-l border-[#eaeaea] transition-colors duration-75 text-center"
+                  style={{
+                    width: '40px',
+                    minWidth: '40px',
+                    maxWidth: '40px',
+                    boxShadow: '2px 0 8px 0 rgba(0,0,0,0.15)',
+                    color: '#000000',
+                  }}
+                >
+                  {getExchangeRank(exchange.app_name)}
+                </td>
                 {columns.map((column) => {
                   const isFirstColumn = column.key === 'app_name';
                   return (
@@ -415,7 +482,7 @@ export default function ComparisonTable() {
                       key={column.key}
                       className={`whitespace-nowrap text-[13px] border border-[#eaeaea] transition-colors duration-75 ${
                         isFirstColumn
-                          ? 'sticky left-0 z-10 bg-white group-hover:bg-[#f0f0f0]! px-2 py-1.5'
+                          ? 'sticky left-[40px] z-10 bg-white group-hover:!bg-[#f0f0f0] px-2 py-1.5'
                           : 'px-2 py-1.5'
                       }`}
                       style={{

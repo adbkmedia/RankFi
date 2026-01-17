@@ -15,7 +15,7 @@ export default function Header() {
           {/* Logo */}
           <Link href="/" className="flex items-center">
             <img 
-              src="/images/logos/RankFi-Logo-White.png" 
+              src="/images/logos/RankFi-Logo-V2.png" 
               alt="RankFi" 
               className="h-8 w-auto"
             />
@@ -24,10 +24,11 @@ export default function Header() {
           {/* Navigation Links - Right Aligned */}
           <nav className="hidden md:flex items-center gap-6 text-sm">
             {/* Comparisons Dropdown */}
-            <div className="relative">
+            <div className="relative"
+              onMouseEnter={() => setComparisonsOpen(true)}
+              onMouseLeave={() => setComparisonsOpen(false)}
+            >
               <button
-                onMouseEnter={() => setComparisonsOpen(true)}
-                onMouseLeave={() => setComparisonsOpen(false)}
                 className="text-white hover:text-gray-300 transition-colors font-bold flex items-center gap-1 text-sm"
               >
                 Comparisons
@@ -37,9 +38,7 @@ export default function Header() {
               </button>
               {comparisonsOpen && (
                 <div 
-                  className="absolute top-full right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50"
-                  onMouseEnter={() => setComparisonsOpen(true)}
-                  onMouseLeave={() => setComparisonsOpen(false)}
+                  className="absolute top-full right-0 pt-1 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50"
                 >
                   <Link href="/best-crypto-exchanges" className="flex items-center gap-3 px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors text-sm">
                     <svg className="w-5 h-5 text-[#00a38f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -70,10 +69,11 @@ export default function Header() {
             </div>
 
             {/* Rankings Dropdown */}
-            <div className="relative">
+            <div className="relative"
+              onMouseEnter={() => setRankingsOpen(true)}
+              onMouseLeave={() => setRankingsOpen(false)}
+            >
               <button
-                onMouseEnter={() => setRankingsOpen(true)}
-                onMouseLeave={() => setRankingsOpen(false)}
                 className="text-white hover:text-gray-300 transition-colors font-bold flex items-center gap-1 text-sm"
               >
                 Rankings
@@ -83,9 +83,7 @@ export default function Header() {
               </button>
               {rankingsOpen && (
                 <div 
-                  className="absolute top-full right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50"
-                  onMouseEnter={() => setRankingsOpen(true)}
-                  onMouseLeave={() => setRankingsOpen(false)}
+                  className="absolute top-full right-0 pt-1 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50"
                 >
                   <Link href="/rankings/top-exchanges" className="flex items-center gap-3 px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors text-sm">
                     <svg className="w-5 h-5 text-[#00a38f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -129,15 +127,13 @@ export default function Header() {
             </Link>
 
             {/* Global Dropdown */}
-            <div className="relative">
+            <div className="relative"
+              onMouseEnter={() => setGlobalOpen(true)}
+              onMouseLeave={() => setGlobalOpen(false)}
+            >
               <button
-                onMouseEnter={() => setGlobalOpen(true)}
-                onMouseLeave={() => setGlobalOpen(false)}
-                className="text-white hover:text-gray-300 transition-colors font-bold flex items-center gap-1 text-sm"
+                className="text-white hover:text-gray-300 transition-colors font-bold flex items-center gap-1.5 text-sm px-3 py-1.5 rounded border border-gray-600 bg-[#1a1a1a] hover:bg-[#2a2a2a]"
               >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
                 Global
                 <svg className={`w-3 h-3 transition-transform ${globalOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -145,39 +141,19 @@ export default function Header() {
               </button>
               {globalOpen && (
                 <div 
-                  className="absolute top-full right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50"
-                  onMouseEnter={() => setGlobalOpen(true)}
-                  onMouseLeave={() => setGlobalOpen(false)}
+                  className="absolute top-full right-0 pt-1 w-48 bg-[#2d2d2d] rounded-lg shadow-xl border border-gray-600 py-2 z-50 overflow-hidden"
                 >
-                  <button className="flex items-center gap-3 w-full text-left px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors text-sm">
-                    <svg className="w-5 h-5 text-[#00a38f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>United States</span>
+                  <button className="flex items-center w-full text-left px-4 py-2.5 text-white hover:bg-[#3a3a3a] transition-colors text-sm bg-[#3a3a3a]">
+                    <span>Global</span>
                   </button>
-                  <button className="flex items-center gap-3 w-full text-left px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors text-sm">
-                    <svg className="w-5 h-5 text-[#00a38f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                  <button className="flex items-center w-full text-left px-4 py-2.5 text-white hover:bg-[#3a3a3a] transition-colors text-sm">
                     <span>Canada</span>
                   </button>
-                  <button className="flex items-center gap-3 w-full text-left px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors text-sm">
-                    <svg className="w-5 h-5 text-[#00a38f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>United Kingdom</span>
+                  <button className="flex items-center w-full text-left px-4 py-2.5 text-white hover:bg-[#3a3a3a] transition-colors text-sm">
+                    <span>USA</span>
                   </button>
-                  <button className="flex items-center gap-3 w-full text-left px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors text-sm">
-                    <svg className="w-5 h-5 text-[#00a38f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                  <button className="flex items-center w-full text-left px-4 py-2.5 text-white hover:bg-[#3a3a3a] transition-colors text-sm">
                     <span>Australia</span>
-                  </button>
-                  <button className="flex items-center gap-3 w-full text-left px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors text-sm">
-                    <svg className="w-5 h-5 text-[#00a38f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>Europe</span>
                   </button>
                 </div>
               )}

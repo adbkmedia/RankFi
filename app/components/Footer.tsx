@@ -9,7 +9,7 @@ export default function Footer() {
         <div className="flex items-center justify-center">
           <Link href="/" className="flex items-center">
             <img 
-              src="/images/logos/RankFi-Logo-White.png" 
+              src="/images/logos/RankFi-Logo-V2.png" 
               alt="RankFi" 
               className="h-6 w-auto"
             />

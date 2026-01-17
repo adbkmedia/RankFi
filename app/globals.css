@@ -1,15 +1,60 @@
 @import "tailwindcss";
 
+/* ============================================
+   RANKFI DESIGN TOKENS
+   ============================================
+   All design tokens are defined here for easy maintenance.
+   Change colors, fonts, and spacing in one place.
+   See STYLE_GUIDE.md for usage guidelines.
+   ============================================ */
+
 :root {
+  /* Base Colors */
   --background: #ffffff;
   --foreground: #171717;
+  
+  /* RankFi Brand Colors - CHANGE THESE TO UPDATE BRAND */
+  --rankfi-teal: #00a38f;
+  --rankfi-dark: #0a0a0a;
+  --rankfi-gray: #2d2d2d;
+  --rankfi-light-gray: #f0f0f0;
+  --rankfi-hover-gray: #e0e0e0;
+  --rankfi-page-bg: #fafafa;
+  --rankfi-border: #eaeaea;
+  
+  /* Text Colors */
+  --rankfi-text-black: #000000;
+  --rankfi-text-dark-gray: #333333;
+  --rankfi-text-light-gray: #666666;
+  --rankfi-text-white: #ffffff;
 }
 
+/* Tailwind Theme Configuration */
 @theme inline {
+  /* Colors - Use these in Tailwind classes like: bg-rankfi-teal, text-rankfi-teal */
+  --color-rankfi-teal: var(--rankfi-teal);
+  --color-rankfi-dark: var(--rankfi-dark);
+  --color-rankfi-gray: var(--rankfi-gray);
+  --color-rankfi-light-gray: var(--rankfi-light-gray);
+  --color-rankfi-hover-gray: var(--rankfi-hover-gray);
+  --color-rankfi-page-bg: var(--rankfi-page-bg);
+  --color-rankfi-border: var(--rankfi-border);
+  --color-rankfi-text-black: var(--rankfi-text-black);
+  --color-rankfi-text-dark-gray: var(--rankfi-text-dark-gray);
+  --color-rankfi-text-light-gray: var(--rankfi-text-light-gray);
+  --color-rankfi-text-white: var(--rankfi-text-white);
+  
+  /* Base Colors */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  
+  /* Fonts - CHANGE FONTS HERE */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  
+  /* Font Sizes - Custom sizes for RankFi */
+  --font-size-table-header: 12px;
+  --font-size-table-body: 13px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,8 +64,15 @@
   }
 }
 
+/* Base Styles */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* Using Inter font */
+  font-family: var(--font-geist-sans), 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+}
+
+/* Ensure all elements inherit Inter font */
+* {
+  font-family: inherit;
 }
