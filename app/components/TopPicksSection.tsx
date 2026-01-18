@@ -22,19 +22,9 @@ const topPicks = [
 ];
 
 export default function TopPicksSection() {
+
   return (
     <div className="relative py-7">
-      {/* Background Image - Full Section */}
-      <div 
-        className="absolute inset-0 z-0"
-        style={{
-          backgroundImage: 'url(/images/logos/BG Green chart.png)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-        }}
-      />
-      
       {/* Content Container */}
       <div className="max-w-7xl mx-auto px-4 relative z-10">
         {/* Header */}
@@ -56,20 +46,28 @@ export default function TopPicksSection() {
               </button>
             </Tooltip>
           </div>
-          <Tooltip
-            content="RankFi earns revenue through affiliate partnerships. This does not affect our data or recommendations."
-            linkText="View Disclosure Policy"
-            linkUrl="/terms-of-service/"
-            position="top"
-            align="right"
-          >
+          <div className="flex items-center gap-2">
             <a
               href="/terms-of-service/"
               className="text-[#00a38f] hover:underline text-sm"
             >
               Affiliate Disclosure
             </a>
-          </Tooltip>
+            <Tooltip
+              content="RankFi earns revenue through affiliate partnerships. This does not affect our data or recommendations."
+              linkText="View Disclosure Policy"
+              linkUrl="/terms-of-service/"
+              position="top"
+              align="right"
+            >
+              <button
+                className="w-3.5 h-3.5 rounded-full bg-gray-400 text-white text-xs flex items-center justify-center hover:bg-gray-500 transition-colors cursor-help"
+                aria-label="Affiliate Disclosure information"
+              >
+                ?
+              </button>
+            </Tooltip>
+          </div>
         </div>
 
         {/* Exchange Cards Grid */}
@@ -78,28 +76,35 @@ export default function TopPicksSection() {
             <div
               key={idx}
               className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-lg transition-shadow relative overflow-hidden"
+              id={`card-${idx}`}
+              style={{
+                backgroundImage: 'url(/images/logos/BG-Green-chart.png)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+              }}
             >
               {/* Card Content */}
               <div className="relative z-10">
-                {/* Top Row: Logo/Name and Arrow Button */}
-                <div className="flex items-start justify-between mb-3">
+                {/* Top Row: Logo/Name */}
+                <div className="flex items-center mb-3 pr-12" id={`top-row-${idx}`}>
                   {/* Exchange Logo/Name */}
-                  <div className="flex items-center flex-1">
+                  <div className="flex items-center flex-1" id={`logo-container-${idx}`}>
                     {exchange.badge ? (
                       <>
-                        <span className="text-xl font-bold text-purple-600 lowercase">
+                        <span className="text-xl font-bold text-purple-600 lowercase" id={`logo-text-${idx}`}>
                           kraken
                         </span>
-                        <span className="ml-2 bg-black text-white text-xs font-semibold px-2 py-0.5 rounded">
+                        <span className="ml-2 bg-black text-white text-xs font-semibold px-2 py-0.5 rounded" id={`badge-${idx}`}>
                           {exchange.badge}
                         </span>
                       </>
                     ) : exchange.logoColor === 'yellow' ? (
-                      <span className="text-xl font-bold text-yellow-500">
+                      <span className="text-xl font-bold text-yellow-500" id={`logo-text-${idx}`}>
                         {exchange.name}
                       </span>
                     ) : (
-                      <span className="text-xl font-bold text-gray-900">
+                      <span className="text-xl font-bold text-gray-900" id={`logo-text-${idx}`}>
                         {exchange.name.split('').map((char, i) => (
                           <span key={i} className={char === 'I' ? 'text-yellow-500' : 'text-gray-900'}>
                             {char}
@@ -108,23 +113,6 @@ export default function TopPicksSection() {
                       </span>
                     )}
                   </div>
-                  
-                  {/* Arrow Button - Top Right */}
-                  <button className="w-8 h-8 rounded-full border-2 border-gray-300 hover:border-gray-400 flex items-center justify-center transition-colors bg-white shrink-0 ml-3">
-                    <svg
-                      className="w-4 h-4 text-gray-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13 7l5 5m0 0l-5 5m5-5H6"
-                      />
-                    </svg>
-                  </button>
                 </div>
 
                 {/* Description */}
@@ -132,6 +120,26 @@ export default function TopPicksSection() {
                   {exchange.description}
                 </p>
               </div>
+              
+              {/* Arrow Button - Absolutely positioned, centered in card */}
+              <button 
+                className="absolute top-1/2 right-5 -translate-y-1/2 w-9 h-9 rounded-full border-2 border-gray-300 hover:border-gray-400 flex items-center justify-center transition-colors bg-white z-20" 
+                id={`arrow-button-${idx}`}
+              >
+                <svg
+                  className="w- h-5 text-gray-300 rotate-315"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 7l5 5m0 0l-5 5m5-5H6"
+                  />
+                </svg>
+              </button>
             </div>
           ))}
         </div>

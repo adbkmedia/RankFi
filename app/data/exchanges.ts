@@ -28,7 +28,9 @@ export const exchanges: Exchange[] = [
     proof_of_reserves: false,
     uses_cold_storage: true,
     insurance_policy: true,
+    insurance_policy_url: 'https://ascendex.com/insurance', // Placeholder - replace with actual URL
     hacks_or_incidents: '2021',
+    hacks_or_incidents_url: 'https://www.binance.com/en/support/announcement/360028031711', // Placeholder - replace with actual URL
     other_incidents: 'No',
     '2fa': true,
     kyc: 'Optional',
@@ -59,10 +61,17 @@ export const exchanges: Exchange[] = [
     founded: '2017',
     number_of_users: '263M',
     proof_of_reserves: true,
+    proof_of_reserves_url: 'https://www.binance.com/en/proof-of-reserves', // Placeholder - replace with actual URL
     uses_cold_storage: true,
     insurance_policy: '$1.1B',
+    insurance_policy_url: 'https://www.binance.com/en/insurance', // Placeholder - replace with actual URL
     hacks_or_incidents: '2019',
+    hacks_or_incidents_url: 'https://www.binance.com/en/support/announcement/360028031711',
     other_incidents: '2023, 2025',
+    other_incidents_url: [
+      'https://www.justice.gov/usao-wdwa/pr/binance-and-ceo-plead-guilty-federal-charges-4b-resolution',
+      'https://www.icij.org/investigations/coin-laundry/cryptocurrency-exchanges-binance-okx-money-laundering-crime/'
+    ],
     '2fa': true,
     kyc: 'Yes',
     publicly_traded: false,
@@ -161,6 +170,7 @@ export const exchanges: Exchange[] = [
     uses_cold_storage: true,
     insurance_policy: false,
     hacks_or_incidents: '2021',
+    hacks_or_incidents_url: 'https://www.binance.com/en/support/announcement/360028031711', // Placeholder - replace with actual URL
     other_incidents: 'No',
     '2fa': true,
     kyc: 'Yes',
@@ -194,6 +204,7 @@ export const exchanges: Exchange[] = [
     uses_cold_storage: true,
     insurance_policy: false,
     hacks_or_incidents: '2019',
+    hacks_or_incidents_url: 'https://www.binance.com/en/support/announcement/360028031711', // Placeholder - replace with actual URL
     other_incidents: 'No',
     '2fa': true,
     kyc: 'Optional',
@@ -623,7 +634,9 @@ export const exchanges: Exchange[] = [
     uses_cold_storage: true,
     insurance_policy: false,
     hacks_or_incidents: '2018',
+    hacks_or_incidents_url: 'https://www.binance.com/en/support/announcement/360028031711', // Placeholder - replace with actual URL
     other_incidents: '2022',
+    other_incidents_url: 'https://www.justice.gov/usao-wdwa/pr/binance-and-ceo-plead-guilty-federal-charges-4b-resolution', // Placeholder - replace with actual URL
     '2fa': true,
     kyc: 'Yes',
     publicly_traded: false,
@@ -755,6 +768,7 @@ export const exchanges: Exchange[] = [
     uses_cold_storage: true,
     insurance_policy: false,
     hacks_or_incidents: '2020',
+    hacks_or_incidents_url: 'https://www.binance.com/en/support/announcement/360028031711', // Placeholder - replace with actual URL
     other_incidents: 'No',
     '2fa': true,
     kyc: 'Optional',

@@ -4,6 +4,13 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { Exchange } from '../types/exchange';
 import { exchanges } from '../data/exchanges';
 import { formatCellValue, getPlaceholderColor, getSortComparison } from '../utils/tableHelpers';
+import IncidentBadge from './IncidentBadge';
+import {
+  PreviewLinkCard,
+  PreviewLinkCardTrigger,
+  PreviewLinkCardContent,
+  PreviewLinkCardImage,
+} from '@/components/animate-ui/components/radix/preview-link-card';
 
 type FilterType = 'features' | 'fees' | 'security';
 
@@ -111,6 +118,16 @@ export default function ComparisonTable() {
   const [compareDropdownOpen, setCompareDropdownOpen] = useState(false);
   const [compareSearchTerm, setCompareSearchTerm] = useState('');
   const compareDropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Region selector state
+  const [selectedRegion, setSelectedRegion] = useState<string>('global');
+  const [regionDropdownOpen, setRegionDropdownOpen] = useState(false);
+  const regionDropdownRef = useRef<HTMLDivElement>(null);
+  
+  const regions = [
+    { id: 'global', label: '🌎 Global', url: '' },
+    { id: 'canada', label: '🇨🇦 Canada', url: '' },
+  ];
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -121,16 +138,22 @@ export default function ComparisonTable() {
       ) {
         setCompareDropdownOpen(false);
       }
+      if (
+        regionDropdownRef.current &&
+        !regionDropdownRef.current.contains(event.target as Node)
+      ) {
+        setRegionDropdownOpen(false);
+      }
     };
 
-    if (compareDropdownOpen) {
+    if (compareDropdownOpen || regionDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [compareDropdownOpen]);
+  }, [compareDropdownOpen, regionDropdownOpen]);
 
   const filters = [
     { id: 'features' as FilterType, label: 'Features' },
@@ -297,6 +320,43 @@ export default function ComparisonTable() {
       {/* Filter Buttons and Compare */}
       <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
         <div className="flex flex-wrap gap-3">
+          {/* Region Selector */}
+          <div className="relative" ref={regionDropdownRef}>
+            <button
+              onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
+              className="px-5 py-2 rounded-lg text-[13px] font-normal transition-colors cursor-pointer bg-[#f0f0f0] text-black hover:bg-[#e0e0e0]"
+            >
+              {regions.find(r => r.id === selectedRegion)?.label || '🌎 Global'}
+            </button>
+            
+            {/* Region Dropdown - Variation 5 style (no checkmark) */}
+            {regionDropdownOpen && (
+              <div
+                className="absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-md z-50"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {regions.map((region) => (
+                  <button
+                    key={region.id}
+                    onClick={() => {
+                      setSelectedRegion(region.id);
+                      setRegionDropdownOpen(false);
+                      // URL handling will be implemented later
+                      if (region.url) {
+                        // window.location.href = region.url;
+                      }
+                    }}
+                    className={`${
+                      selectedRegion === region.id ? 'bg-gray-100' : 'hover:bg-gray-50'
+                    } w-full text-left px-4 py-2 text-[13px] text-gray-700 transition-colors`}
+                  >
+                    {region.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          
           {filters.map((filter) => (
             <button
               key={filter.id}
@@ -421,6 +481,8 @@ export default function ComparisonTable() {
                 const isSorted = sortState.column === column.key;
                 const isAsc = sortState.direction === 'asc';
                 const isFirstColumn = column.key === 'app_name';
+                const isHacksColumn = column.key === 'hacks_or_incidents';
+                const isIncidentsColumn = column.key === 'other_incidents';
                 return (
                   <th
                     key={column.key}
@@ -437,6 +499,10 @@ export default function ComparisonTable() {
                         minWidth: '175px',
                         maxWidth: '175px',
                         boxShadow: '2px 0 4px -2px rgba(0,0,0,0.15)',
+                      }),
+                      ...((isHacksColumn || isIncidentsColumn) && {
+                        minWidth: '120px',
+                        width: 'auto',
                       }),
                     }}
                   >
@@ -477,6 +543,155 @@ export default function ComparisonTable() {
                 </td>
                 {columns.map((column) => {
                   const isFirstColumn = column.key === 'app_name';
+                  const isHacksColumn = column.key === 'hacks_or_incidents';
+                  const isIncidentsColumn = column.key === 'other_incidents';
+                  const isProofOfReservesColumn = column.key === 'proof_of_reserves';
+                  const isInsurancePolicyColumn = column.key === 'insurance_policy';
+                  
+                  // Determine cell content
+                  let cellContent;
+                  if (isFirstColumn) {
+                    cellContent = <div className="text-left">{renderNameCell(exchange)}</div>;
+                  } else if (isHacksColumn) {
+                    cellContent = (
+                      <div className="text-center">
+                        <IncidentBadge
+                          value={String(exchange.hacks_or_incidents || 'No')}
+                          url={exchange.hacks_or_incidents_url}
+                          type="hack"
+                        />
+                      </div>
+                    );
+                  } else if (isIncidentsColumn) {
+                    cellContent = (
+                      <div className="text-center">
+                        <IncidentBadge
+                          value={String(exchange.other_incidents || 'No')}
+                          url={exchange.other_incidents_url}
+                          type="incident"
+                        />
+                      </div>
+                    );
+                  } else if (isProofOfReservesColumn) {
+                    const rawValue = exchange.proof_of_reserves;
+                    const value = formatCellValue(rawValue);
+                    const url = exchange.proof_of_reserves_url;
+                    const shouldBeLink = (rawValue === true || rawValue === 'Yes') && url;
+                    
+                    if (shouldBeLink) {
+                      cellContent = (
+                        <div className="text-center">
+                          <PreviewLinkCard href={url}>
+                            <PreviewLinkCardTrigger
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[#00a38f] hover:underline"
+                            >
+                              {value}
+                            </PreviewLinkCardTrigger>
+                            <PreviewLinkCardContent 
+                              side="top" 
+                              align="center" 
+                              sideOffset={8}
+                              className="p-0 bg-white border border-gray-200 shadow-xl max-w-xs overflow-hidden"
+                              style={{ zIndex: 99999 }}
+                            >
+                              <div className="relative">
+                                <PreviewLinkCardImage 
+                                  alt="Link preview" 
+                                  className="w-full h-auto max-h-32 object-cover"
+                                />
+                                <div className="p-3 bg-white border-t border-gray-200">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-medium text-gray-900 truncate">
+                                        {new URL(url).hostname.replace('www.', '')}
+                                      </p>
+                                      <p className="text-xs text-gray-500 truncate mt-0.5">
+                                        {url.length > 50 ? `${url.substring(0, 50)}...` : url}
+                                      </p>
+                                    </div>
+                                    <svg 
+                                      className="w-4 h-4 text-gray-400 flex-shrink-0" 
+                                      fill="none" 
+                                      stroke="currentColor" 
+                                      viewBox="0 0 24 24"
+                                      aria-hidden="true"
+                                    >
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                    </svg>
+                                  </div>
+                                </div>
+                              </div>
+                            </PreviewLinkCardContent>
+                          </PreviewLinkCard>
+                        </div>
+                      );
+                    } else {
+                      cellContent = <div className="text-center">{value}</div>;
+                    }
+                  } else if (isInsurancePolicyColumn) {
+                    const rawValue = exchange.insurance_policy;
+                    const value = formatCellValue(rawValue);
+                    const url = exchange.insurance_policy_url;
+                    const shouldBeLink = (rawValue !== false && rawValue !== 'No' && rawValue !== 'no') && url;
+                    
+                    if (shouldBeLink) {
+                      cellContent = (
+                        <div className="text-center">
+                          <PreviewLinkCard href={url}>
+                            <PreviewLinkCardTrigger
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[#00a38f] hover:underline"
+                            >
+                              {value}
+                            </PreviewLinkCardTrigger>
+                            <PreviewLinkCardContent 
+                              side="top" 
+                              align="center" 
+                              sideOffset={8}
+                              className="p-0 bg-white border border-gray-200 shadow-xl max-w-xs overflow-hidden"
+                              style={{ zIndex: 99999 }}
+                            >
+                              <div className="relative">
+                                <PreviewLinkCardImage 
+                                  alt="Link preview" 
+                                  className="w-full h-auto max-h-32 object-cover"
+                                />
+                                <div className="p-3 bg-white border-t border-gray-200">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-medium text-gray-900 truncate">
+                                        {new URL(url).hostname.replace('www.', '')}
+                                      </p>
+                                      <p className="text-xs text-gray-500 truncate mt-0.5">
+                                        {url.length > 50 ? `${url.substring(0, 50)}...` : url}
+                                      </p>
+                                    </div>
+                                    <svg 
+                                      className="w-4 h-4 text-gray-400 flex-shrink-0" 
+                                      fill="none" 
+                                      stroke="currentColor" 
+                                      viewBox="0 0 24 24"
+                                      aria-hidden="true"
+                                    >
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                    </svg>
+                                  </div>
+                                </div>
+                              </div>
+                            </PreviewLinkCardContent>
+                          </PreviewLinkCard>
+                        </div>
+                      );
+                    } else {
+                      cellContent = <div className="text-center">{value}</div>;
+                    }
+                  } else {
+                    cellContent = <div className="text-center">{formatCellValue(exchange[column.key as keyof Exchange])}</div>;
+                  }
+                  
                   return (
                     <td
                       key={column.key}
@@ -492,14 +707,14 @@ export default function ComparisonTable() {
                           maxWidth: '175px',
                           boxShadow: '2px 0 4px -2px rgba(0,0,0,0.15)',
                         }),
+                        ...((isHacksColumn || isIncidentsColumn) && {
+                          minWidth: '120px',
+                          width: 'auto',
+                        }),
                         color: '#000000',
                       }}
                     >
-                      {isFirstColumn ? (
-                        <div className="text-left">{renderNameCell(exchange)}</div>
-                      ) : (
-                        <div className="text-center">{formatCellValue(exchange[column.key as keyof Exchange])}</div>
-                      )}
+                      {cellContent}
                     </td>
                   );
                 })}
@@ -507,14 +722,54 @@ export default function ComparisonTable() {
                   className="px-2 py-1.5 whitespace-nowrap text-[13px] border border-[#eaeaea] text-center"
                   style={{ color: '#000000' }}
                 >
-                  <a
-                    href={exchange.website || '#'}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#00a38f] hover:underline"
-                  >
-                    Visit →
-                  </a>
+                  {exchange.website ? (
+                    <PreviewLinkCard href={exchange.website}>
+                      <PreviewLinkCardTrigger
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#00a38f] hover:underline"
+                      >
+                        Visit →
+                      </PreviewLinkCardTrigger>
+                      <PreviewLinkCardContent 
+                        side="top" 
+                        align="center" 
+                        sideOffset={8}
+                        className="p-0 bg-white border border-gray-200 shadow-xl max-w-xs overflow-hidden"
+                        style={{ zIndex: 99999 }}
+                      >
+                        <div className="relative">
+                          <PreviewLinkCardImage 
+                            alt="Website preview" 
+                            className="w-full h-auto max-h-32 object-cover"
+                          />
+                          <div className="p-3 bg-white border-t border-gray-200">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-gray-900 truncate">
+                                  {new URL(exchange.website).hostname.replace('www.', '')}
+                                </p>
+                                <p className="text-xs text-gray-500 truncate mt-0.5">
+                                  {exchange.website.length > 50 ? `${exchange.website.substring(0, 50)}...` : exchange.website}
+                                </p>
+                              </div>
+                              <svg 
+                                className="w-4 h-4 text-gray-400 flex-shrink-0" 
+                                fill="none" 
+                                stroke="currentColor" 
+                                viewBox="0 0 24 24"
+                                aria-hidden="true"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+                      </PreviewLinkCardContent>
+                    </PreviewLinkCard>
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  )}
                 </td>
               </tr>
             ))}

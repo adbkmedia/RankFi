@@ -466,31 +466,6 @@ export default function StyleGuide() {
                 </li>
               </ul>
             </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-3 text-gray-800">Icons</h3>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <a href="https://lucide.dev/icons/" target="_blank" rel="noopener noreferrer" className="text-rankfi-teal hover:underline">
-                    Lucide Icons →
-                  </a>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-3 text-gray-800">Other Resources</h3>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <a href="https://www.radix-ui.com/primitives/docs/overview/introduction" target="_blank" rel="noopener noreferrer" className="text-rankfi-teal hover:underline">
-                    Radix UI Primitives →
-                  </a>
-                </li>
-                <li>
-                  <a href="https://tailwindcss.com/docs" target="_blank" rel="noopener noreferrer" className="text-rankfi-teal hover:underline">
-                    Tailwind CSS Docs →
-                  </a>
-                </li>
-              </ul>
-            </div>
           </div>
         </div>
       </section>

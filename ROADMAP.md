@@ -54,6 +54,10 @@
 - ✅ Tooltip component with consistent spacing (with/without links)
 - ✅ Fixed dropdown and tooltip hover/click interactions
 - ✅ Enhanced Global dropdown styling with button appearance
+- ✅ Region selector added (left of filter buttons, Variation 5 style)
+- ✅ Incident badges (red/yellow) for hacks and incidents with PreviewLinkCard
+- ✅ PreviewLinkCard integration for external links (website, proof of reserves, insurance)
+- ✅ shadcn/ui integration (@animate-ui PreviewLinkCard component)
 
 **In Progress**:
 - Typography testing and finalization

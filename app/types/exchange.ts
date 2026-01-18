@@ -25,10 +25,14 @@ export type Exchange = {
   founded?: number | string;
   number_of_users?: number | string;
   proof_of_reserves?: boolean | string;
+  proof_of_reserves_url?: string;
   uses_cold_storage?: boolean | string;
   insurance_policy?: boolean | string;
+  insurance_policy_url?: string;
   hacks_or_incidents?: string;
+  hacks_or_incidents_url?: string | string[]; // Support single or multiple URLs
   other_incidents?: string;
+  other_incidents_url?: string | string[]; // Support single or multiple URLs
   '2fa'?: boolean | string;
   kyc?: string;
   publicly_traded?: boolean | string;
