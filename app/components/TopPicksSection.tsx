@@ -1,6 +1,7 @@
 'use client';
 
 import Tooltip from './Tooltip';
+import TableTooltip from './TableTooltip';
 
 const topPicks = [
   {
@@ -31,12 +32,14 @@ export default function TopPicksSection() {
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-2">
             <h2 className="text-md font-normal text-gray-500">Top Picks</h2>
-            <Tooltip
+            <TableTooltip
               content="Based on 2,450 data points below."
               linkText="See our methodology"
               linkUrl="/methodology"
-              position="top"
-              align="left"
+              position="bottom"
+              align="start"
+              variant="default"
+              zIndex={9999}
             >
               <button
                 className="w-3.5 h-3.5 rounded-full bg-gray-400 text-white text-xs flex items-center justify-center hover:bg-gray-500 transition-colors cursor-help"
@@ -44,7 +47,7 @@ export default function TopPicksSection() {
               >
                 ?
               </button>
-            </Tooltip>
+            </TableTooltip>
           </div>
           <div className="flex items-center gap-2">
             <a
@@ -53,12 +56,14 @@ export default function TopPicksSection() {
             >
               Affiliate Disclosure
             </a>
-            <Tooltip
+            <TableTooltip
               content="RankFi earns revenue through affiliate partnerships. This does not affect our data or recommendations."
               linkText="View Disclosure Policy"
               linkUrl="/terms-of-service/"
-              position="top"
-              align="right"
+              position="bottom"
+              align="end"
+              variant="default"
+              zIndex={9999}
             >
               <button
                 className="w-3.5 h-3.5 rounded-full bg-gray-400 text-white text-xs flex items-center justify-center hover:bg-gray-500 transition-colors cursor-help"
@@ -66,7 +71,7 @@ export default function TopPicksSection() {
               >
                 ?
               </button>
-            </Tooltip>
+          </TableTooltip>
           </div>
         </div>
 
@@ -119,27 +124,27 @@ export default function TopPicksSection() {
                 <p className="text-gray-600 text-sm leading-relaxed">
                   {exchange.description}
                 </p>
-              </div>
-              
+                  </div>
+                  
               {/* Arrow Button - Absolutely positioned, centered in card */}
               <button 
                 className="absolute top-1/2 right-5 -translate-y-1/2 w-9 h-9 rounded-full border-2 border-gray-300 hover:border-gray-400 flex items-center justify-center transition-colors bg-white z-20" 
                 id={`arrow-button-${idx}`}
               >
-                <svg
+                    <svg
                   className="w- h-5 text-gray-300 rotate-315"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 7l5 5m0 0l-5 5m5-5H6"
-                  />
-                </svg>
-              </button>
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 7l5 5m0 0l-5 5m5-5H6"
+                      />
+                    </svg>
+                  </button>
             </div>
           ))}
         </div>

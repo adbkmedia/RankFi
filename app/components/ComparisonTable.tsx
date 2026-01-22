@@ -1,10 +1,26 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  getPaginationRowModel,
+  getFilteredRowModel,
+  flexRender,
+  ColumnDef,
+  SortingState,
+  PaginationState,
+  VisibilityState,
+  RowSelectionState,
+} from '@tanstack/react-table';
+import { Dialog, Switch } from '@headlessui/react';
 import { Exchange } from '../types/exchange';
 import { exchanges } from '../data/exchanges';
-import { formatCellValue, getPlaceholderColor, getSortComparison } from '../utils/tableHelpers';
+import { formatCellValue, getPlaceholderColor, getSortComparison, calculateDiscountedFee } from '../utils/tableHelpers';
 import IncidentBadge from './IncidentBadge';
+import Tooltip from './Tooltip';
+import TableTooltip from './TableTooltip';
 import {
   PreviewLinkCard,
   PreviewLinkCardTrigger,
@@ -22,20 +38,16 @@ const getExchangeRank = (exchangeName: string): number => {
     'AscendEx': 3,
   };
   
-  // If exchange has a specific rank, return it
   if (rankMap[exchangeName]) {
     return rankMap[exchangeName];
   }
   
-  // For other exchanges, assign sequential ranks starting from 4
-  // We'll use a simple hash-based approach to assign consistent ranks
   const allExchanges = exchanges.map(e => e.app_name);
   const rankedExchanges = ['Kraken Pro', 'Binance', 'AscendEx'];
   const unrankedExchanges = allExchanges.filter(name => !rankedExchanges.includes(name));
   
-  // Find index in unranked list and add 4
   const index = unrankedExchanges.indexOf(exchangeName);
-  return index >= 0 ? index + 4 : 999; // Default to 999 if not found
+  return index >= 0 ? index + 4 : 999;
 };
 
 // Column definitions matching your live site
@@ -85,7 +97,6 @@ const renderNameCell = (exchange: Exchange) => {
 
   return (
     <div className="flex items-center">
-      {/* Placeholder logo - will be replaced with actual images later */}
       <div
         className="w-5 h-5 rounded mr-2 shrink-0"
         style={{ backgroundColor: placeholderColor }}
@@ -100,29 +111,79 @@ const renderNameCell = (exchange: Exchange) => {
   );
 };
 
-type SortState = {
-  column: string;
-  direction: 'asc' | 'desc';
+// Toggle switch component using Headless UI
+const ToggleSwitch = ({ 
+  enabled, 
+  onChange, 
+  disabled = false 
+}: { 
+  enabled: boolean; 
+  onChange: () => void;
+  disabled?: boolean;
+}) => {
+  return (
+    <div onClick={(e) => e.stopPropagation()}>
+      <Switch
+        checked={enabled}
+        onChange={onChange}
+        disabled={disabled}
+        className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white ${
+          enabled ? 'bg-[#00a38f]' : 'bg-gray-300'
+        } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+      >
+        <span className="sr-only">Toggle discount</span>
+        <span
+          className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+            enabled ? 'translate-x-4' : 'translate-x-0.5'
+          }`}
+        />
+      </Switch>
+    </div>
+  );
+};
+
+// Custom sorting function for rank
+const rankSortingFn = (rowA: any, rowB: any, columnId: string) => {
+  const rankA = getExchangeRank(rowA.original.app_name);
+  const rankB = getExchangeRank(rowB.original.app_name);
+  if (rankA < rankB) return -1;
+  if (rankA > rankB) return 1;
+  return 0;
+};
+
+// Custom sorting function using existing helper
+// Note: TanStack handles direction, so we always sort ascending here
+const customSortingFn = (rowA: any, rowB: any, columnId: string) => {
+  const exchangeA = rowA.original as Exchange;
+  const exchangeB = rowB.original as Exchange;
+  const sortComparison = getSortComparison(columnId, 'asc');
+  return sortComparison(exchangeA, exchangeB);
 };
 
 export default function ComparisonTable() {
   const [activeFilter, setActiveFilter] = useState<FilterType>('features');
-  const [sortState, setSortState] = useState<SortState>({
-    column: 'rank',
-    direction: 'asc',
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'rank', desc: false }]);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 25, // Default to 25 rows
   });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(25);
-  const [selectedExchanges, setSelectedExchanges] = useState<Set<string>>(new Set());
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [globalFilter, setGlobalFilter] = useState('');
   const [comparisonApplied, setComparisonApplied] = useState(false);
   const [compareDropdownOpen, setCompareDropdownOpen] = useState(false);
-  const [compareSearchTerm, setCompareSearchTerm] = useState('');
+  const [columnVisibilityModalOpen, setColumnVisibilityModalOpen] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const compareDropdownRef = useRef<HTMLDivElement>(null);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
   
   // Region selector state
   const [selectedRegion, setSelectedRegion] = useState<string>('global');
   const [regionDropdownOpen, setRegionDropdownOpen] = useState(false);
   const regionDropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Discount toggle state
+  const [discountToggleEnabled, setDiscountToggleEnabled] = useState(false);
   
   const regions = [
     { id: 'global', label: '🌎 Global', url: '' },
@@ -161,65 +222,398 @@ export default function ComparisonTable() {
     { id: 'security' as FilterType, label: 'Security' },
   ];
 
-  const columns = columnDefinitions[activeFilter];
+  // Build TanStack columns based on active filter
+  const columns = useMemo<ColumnDef<Exchange>[]>(() => {
+    const baseColumns: ColumnDef<Exchange>[] = [
+      // Rank column
+      {
+        id: 'rank',
+        header: '#',
+        enableSorting: true,
+        enableHiding: true,
+        accessorFn: (row) => getExchangeRank(row.app_name),
+        sortingFn: rankSortingFn,
+        cell: ({ row }) => (
+          <div className="text-center">{getExchangeRank(row.original.app_name)}</div>
+        ),
+        size: 40,
+        minSize: 40,
+        maxSize: 40,
+      },
+    ];
 
-  // Handle header click for sorting
-  const handleSort = (columnKey: string) => {
-    setSortState((prev) => {
-      if (prev.column === columnKey) {
-        // Toggle direction if same column
-        return {
-          column: columnKey,
-          direction: prev.direction === 'asc' ? 'desc' : 'asc',
-        };
-      } else {
-        // New column, set to ascending
-        return {
-          column: columnKey,
-          direction: 'asc',
-        };
-      }
+    const filterColumns = columnDefinitions[activeFilter];
+    
+    // Add columns based on active filter
+    filterColumns.forEach((col) => {
+      const isNameColumn = col.key === 'app_name';
+      const isHacksColumn = col.key === 'hacks_or_incidents';
+      const isIncidentsColumn = col.key === 'other_incidents';
+      const isProofOfReservesColumn = col.key === 'proof_of_reserves';
+      const isInsurancePolicyColumn = col.key === 'insurance_policy';
+      const isDiscountColumn = col.key === 'rankfi_discount';
+      const isFeeColumn = ['maker_fee', 'taker_fee', 'futures_maker_fee', 'futures_taker_fee'].includes(col.key);
+
+      const columnDef: ColumnDef<Exchange> = {
+        id: col.key,
+        accessorKey: col.key,
+        header: col.label,
+        enableSorting: true,
+        sortingFn: col.key === 'rank' ? rankSortingFn : customSortingFn,
+        cell: ({ row }) => {
+          const exchange = row.original;
+          
+          if (isNameColumn) {
+            return <div className="text-left">{renderNameCell(exchange)}</div>;
+          } else if (isDiscountColumn) {
+            const discountValue = exchange.rankfi_discount || 'N/A';
+            const discountText = discountValue !== 'N/A' ? `${discountValue} Discount` : 'N/A';
+            return (
+              <div className="text-center">
+                <div className="flex items-center justify-center gap-2">
+                  <ToggleSwitch
+                    enabled={discountToggleEnabled}
+                    onChange={() => setDiscountToggleEnabled(!discountToggleEnabled)}
+                  />
+                  <span className="text-[13px]">{discountText}</span>
+                  <TableTooltip
+                    content="This discount applies to trading fees when enabled via the toggle."
+                    position="bottom"
+                    variant="default"
+                    zIndex={9999}
+                  >
+                    <svg
+                      className="w-4 h-4 text-gray-400 cursor-help"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                      aria-hidden="true"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </TableTooltip>
+                </div>
+              </div>
+            );
+          } else if (isFeeColumn) {
+            const originalFee = formatCellValue(exchange[col.key as keyof Exchange]);
+            if (discountToggleEnabled && exchange.rankfi_discount) {
+              const discountedFee = calculateDiscountedFee(originalFee, exchange.rankfi_discount);
+              return (
+                <div className="text-center">
+                  <span>{discountedFee}</span>
+                </div>
+              );
+            }
+            return <div className="text-center">{originalFee}</div>;
+          } else if (isHacksColumn) {
+            return (
+              <div className="text-center">
+                <IncidentBadge
+                  value={String(exchange.hacks_or_incidents || 'No')}
+                  url={exchange.hacks_or_incidents_url}
+                  type="hack"
+                />
+              </div>
+            );
+          } else if (isIncidentsColumn) {
+            return (
+              <div className="text-center">
+                <IncidentBadge
+                  value={String(exchange.other_incidents || 'No')}
+                  url={exchange.other_incidents_url}
+                  type="incident"
+                />
+              </div>
+            );
+          } else if (isProofOfReservesColumn) {
+            const rawValue = exchange.proof_of_reserves;
+            const value = formatCellValue(rawValue);
+            const url = exchange.proof_of_reserves_url;
+            const shouldBeLink = (rawValue === true || rawValue === 'Yes') && url;
+            
+            if (shouldBeLink) {
+              return (
+                <div className="text-center">
+                  <PreviewLinkCard href={url}>
+                    <PreviewLinkCardTrigger
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#00a38f] hover:underline"
+                    >
+                      {value}
+                    </PreviewLinkCardTrigger>
+                    <PreviewLinkCardContent 
+                      side="top" 
+                      align="center" 
+                      sideOffset={8}
+                      className="p-0 bg-white border border-gray-200 shadow-xl max-w-xs overflow-hidden"
+                      style={{ zIndex: 99999 }}
+                    >
+                      <div className="relative">
+                        <PreviewLinkCardImage 
+                          alt="Link preview" 
+                          className="w-full h-auto max-h-32 object-cover"
+                        />
+                        <div className="p-3 bg-white border-t border-gray-200">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-gray-900 truncate">
+                                {new URL(url).hostname.replace('www.', '')}
+                              </p>
+                              <p className="text-xs text-gray-500 truncate mt-0.5">
+                                {url.length > 50 ? `${url.substring(0, 50)}...` : url}
+                              </p>
+                            </div>
+                            <svg 
+                              className="w-4 h-4 text-gray-400 flex-shrink-0" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                              aria-hidden="true"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
+                    </PreviewLinkCardContent>
+                  </PreviewLinkCard>
+                </div>
+              );
+            } else {
+              return <div className="text-center">{value}</div>;
+            }
+          } else if (isInsurancePolicyColumn) {
+            const rawValue = exchange.insurance_policy;
+            const value = formatCellValue(rawValue);
+            const url = exchange.insurance_policy_url;
+            const shouldBeLink = (rawValue !== false && rawValue !== 'No' && rawValue !== 'no') && url;
+            
+            if (shouldBeLink) {
+              return (
+                <div className="text-center">
+                  <PreviewLinkCard href={url}>
+                    <PreviewLinkCardTrigger
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#00a38f] hover:underline"
+                    >
+                      {value}
+                    </PreviewLinkCardTrigger>
+                    <PreviewLinkCardContent 
+                      side="top" 
+                      align="center" 
+                      sideOffset={8}
+                      className="p-0 bg-white border border-gray-200 shadow-xl max-w-xs overflow-hidden"
+                      style={{ zIndex: 99999 }}
+                    >
+                      <div className="relative">
+                        <PreviewLinkCardImage 
+                          alt="Link preview" 
+                          className="w-full h-auto max-h-32 object-cover"
+                        />
+                        <div className="p-3 bg-white border-t border-gray-200">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-gray-900 truncate">
+                                {new URL(url).hostname.replace('www.', '')}
+                              </p>
+                              <p className="text-xs text-gray-500 truncate mt-0.5">
+                                {url.length > 50 ? `${url.substring(0, 50)}...` : url}
+                              </p>
+                            </div>
+                            <svg 
+                              className="w-4 h-4 text-gray-400 flex-shrink-0" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                              aria-hidden="true"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
+                    </PreviewLinkCardContent>
+                  </PreviewLinkCard>
+                </div>
+              );
+            } else {
+              return <div className="text-center">{value}</div>;
+            }
+          } else {
+            return <div className="text-center">{formatCellValue(exchange[col.key as keyof Exchange])}</div>;
+          }
+        },
+        size: isNameColumn ? 175 : undefined,
+        minSize: isNameColumn ? 175 : undefined,
+        maxSize: isNameColumn ? 175 : undefined,
+      };
+
+      baseColumns.push(columnDef);
     });
-  };
 
-  // Sort exchanges based on current sort state
-  const sortedExchanges = useMemo(() => {
-    // Handle rank sorting separately
-    if (sortState.column === 'rank') {
-      const directionMultiplier = sortState.direction === 'asc' ? 1 : -1;
-      return [...exchanges].sort((a, b) => {
-        const rankA = getExchangeRank(a.app_name);
-        const rankB = getExchangeRank(b.app_name);
-        return directionMultiplier * (rankA - rankB);
-      });
+    // Add Website column
+    baseColumns.push({
+      id: 'website',
+      header: 'Website',
+      enableSorting: false,
+      cell: ({ row }) => {
+        const exchange = row.original;
+        return (
+          <div className="text-center">
+            {exchange.website ? (
+              <PreviewLinkCard href={exchange.website}>
+                <PreviewLinkCardTrigger
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#00a38f] hover:underline"
+                >
+                  Visit →
+                </PreviewLinkCardTrigger>
+                <PreviewLinkCardContent 
+                  side="top" 
+                  align="center" 
+                  sideOffset={8}
+                  className="p-0 bg-white border border-gray-200 shadow-xl max-w-xs overflow-hidden"
+                  style={{ zIndex: 99999 }}
+                >
+                  <div className="relative">
+                    <PreviewLinkCardImage 
+                      alt="Website preview" 
+                      className="w-full h-auto max-h-32 object-cover"
+                    />
+                    <div className="p-3 bg-white border-t border-gray-200">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-gray-900 truncate">
+                            {new URL(exchange.website).hostname.replace('www.', '')}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate mt-0.5">
+                            {exchange.website.length > 50 ? `${exchange.website.substring(0, 50)}...` : exchange.website}
+                          </p>
+                        </div>
+                        <svg 
+                          className="w-4 h-4 text-gray-400 flex-shrink-0" 
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </PreviewLinkCardContent>
+              </PreviewLinkCard>
+            ) : (
+              <span className="text-gray-400">—</span>
+            )}
+          </div>
+        );
+      },
+    });
+
+    return baseColumns;
+  }, [activeFilter, discountToggleEnabled]);
+
+  // Filter exchanges based on comparison mode (using TanStack row selection)
+  const filteredExchanges = useMemo(() => {
+    if (comparisonApplied && Object.keys(rowSelection).length > 0) {
+      const selectedNames = Object.keys(rowSelection).filter(key => rowSelection[key]);
+      return exchanges.filter((exchange) =>
+        selectedNames.includes(exchange.app_name)
+      );
     }
-    const sortComparison = getSortComparison(sortState.column, sortState.direction);
-    return [...exchanges].sort(sortComparison);
-  }, [sortState]);
+    return exchanges;
+  }, [comparisonApplied, rowSelection]);
+
 
   // Reset to page 1 when filter changes
   const handleFilterChange = (filter: FilterType) => {
     setActiveFilter(filter);
-    setCurrentPage(1);
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
   };
 
-  // Filter exchanges based on comparison mode
-  const filteredExchanges = useMemo(() => {
-    if (comparisonApplied && selectedExchanges.size > 0) {
-      return sortedExchanges.filter((exchange) =>
-        selectedExchanges.has(exchange.app_name)
-      );
-    }
-    return sortedExchanges;
-  }, [sortedExchanges, comparisonApplied, selectedExchanges]);
+  const table = useReactTable({
+    data: filteredExchanges,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    state: {
+      sorting,
+      pagination,
+      columnVisibility,
+      rowSelection,
+      globalFilter,
+    },
+    onSortingChange: setSorting,
+    onPaginationChange: setPagination,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    onGlobalFilterChange: setGlobalFilter,
+    enableRowSelection: true,
+    getRowId: (row) => row.app_name,
+    manualSorting: false,
+    manualPagination: false,
+  });
 
-  // Calculate pagination (only show if comparison not applied)
-  const totalPages = Math.ceil(filteredExchanges.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedExchanges = comparisonApplied
-    ? filteredExchanges
-    : filteredExchanges.slice(startIndex, endIndex);
+  // Comparison feature handlers (using TanStack row selection)
+  const handleCompareButtonClick = () => {
+    if (comparisonApplied) {
+      setComparisonApplied(false);
+      setRowSelection({});
+      setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+    } else {
+      setCompareDropdownOpen(!compareDropdownOpen);
+    }
+  };
+
+  const handleExchangeToggle = (exchangeName: string) => {
+    const selectedCount = Object.values(rowSelection).filter(Boolean).length;
+    if (rowSelection[exchangeName]) {
+      // Deselect
+      setRowSelection((prev) => {
+        const newSelection = { ...prev };
+        delete newSelection[exchangeName];
+        return newSelection;
+      });
+    } else {
+      // Select (max 7)
+      if (selectedCount < 7) {
+        setRowSelection((prev) => ({
+          ...prev,
+          [exchangeName]: true,
+        }));
+      }
+    }
+  };
+
+  const handleApplyComparison = () => {
+    const selectedCount = Object.values(rowSelection).filter(Boolean).length;
+    if (selectedCount > 0) {
+      setComparisonApplied(true);
+      setCompareDropdownOpen(false);
+      setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+    }
+  };
+
+  // Use TanStack's filtered row model for dropdown
+  const filteredExchangesForDropdown = table.getFilteredRowModel().rows.map(row => row.original);
+
+  // Pagination helpers
+  const totalPages = table.getPageCount();
+  const currentPage = pagination.pageIndex + 1;
+  const startIndex = pagination.pageIndex * pagination.pageSize;
+  const endIndex = startIndex + pagination.pageSize;
+  const totalRows = filteredExchanges.length;
 
   // Generate page numbers to display
   const getPageNumbers = () => {
@@ -228,15 +622,12 @@ export default function ComparisonTable() {
     const current = currentPage;
 
     if (total <= 7) {
-      // Show all pages if 7 or fewer
       for (let i = 1; i <= total; i++) {
         pages.push(i);
       }
     } else {
-      // Always show first page
       pages.push(1);
 
-      // Show pages around current
       const start = Math.max(2, current - 1);
       const end = Math.min(total - 1, current + 1);
 
@@ -252,7 +643,6 @@ export default function ComparisonTable() {
         pages.push('...');
       }
 
-      // Always show last page
       pages.push(total);
     }
 
@@ -261,62 +651,45 @@ export default function ComparisonTable() {
 
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
+      table.setPageIndex(page - 1);
     }
   };
 
   const handleItemsPerPageChange = (value: number) => {
-    setItemsPerPage(value);
-    setCurrentPage(1); // Reset to first page when changing items per page
+    table.setPageSize(value);
+    table.setPageIndex(0);
   };
 
-  // Comparison feature handlers
-  const handleCompareButtonClick = () => {
-    if (comparisonApplied) {
-      // Clear comparison
-      setComparisonApplied(false);
-      setSelectedExchanges(new Set());
-      setCurrentPage(1);
-    } else {
-      // Toggle dropdown
-      setCompareDropdownOpen(!compareDropdownOpen);
-    }
-  };
+  // Infinite scroll handler
+  useEffect(() => {
+    const container = tableContainerRef.current;
+    if (!container) return;
 
-  const handleExchangeToggle = (exchangeName: string) => {
-    setSelectedExchanges((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(exchangeName)) {
-        newSet.delete(exchangeName);
-      } else {
-        if (newSet.size < 7) {
-          newSet.add(exchangeName);
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+
+      if (isNearBottom && !loadingMore && !comparisonApplied) {
+        const currentPageSize = pagination.pageSize;
+        const totalRows = filteredExchanges.length;
+        
+        if (currentPageSize < totalRows) {
+          setLoadingMore(true);
+          // Load 10 more rows
+          setTimeout(() => {
+            table.setPageSize(Math.min(currentPageSize + 10, totalRows));
+            setLoadingMore(false);
+          }, 300);
         }
       }
-      return newSet;
-    });
-  };
+    };
 
-  const handleApplyComparison = () => {
-    if (selectedExchanges.size > 0) {
-      setComparisonApplied(true);
-      setCompareDropdownOpen(false);
-      setCurrentPage(1);
-    }
-  };
-
-  // Filter exchanges for dropdown search
-  const filteredExchangesForDropdown = useMemo(() => {
-    if (!compareSearchTerm) return sortedExchanges;
-    const term = compareSearchTerm.toLowerCase();
-    return sortedExchanges.filter((exchange) =>
-      exchange.app_name.toLowerCase().includes(term)
-    );
-  }, [sortedExchanges, compareSearchTerm]);
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [pagination.pageSize, loadingMore, comparisonApplied, filteredExchanges.length, table]);
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-4">
-
       {/* Filter Buttons and Compare */}
       <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
         <div className="flex flex-wrap gap-3">
@@ -329,7 +702,6 @@ export default function ComparisonTable() {
               {regions.find(r => r.id === selectedRegion)?.label || '🌎 Global'}
             </button>
             
-            {/* Region Dropdown - Variation 5 style (no checkmark) */}
             {regionDropdownOpen && (
               <div
                 className="absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-md z-50"
@@ -341,7 +713,6 @@ export default function ComparisonTable() {
                     onClick={() => {
                       setSelectedRegion(region.id);
                       setRegionDropdownOpen(false);
-                      // URL handling will be implemented later
                       if (region.url) {
                         // window.location.href = region.url;
                       }
@@ -372,7 +743,29 @@ export default function ComparisonTable() {
           ))}
         </div>
 
-        {/* Compare Button */}
+        <div className="flex items-center gap-2">
+          {/* Column Visibility Button */}
+          <button
+            onClick={() => setColumnVisibilityModalOpen(true)}
+            className="px-3 py-2 rounded-lg text-[13px] font-normal transition-colors cursor-pointer bg-[#f0f0f0] text-black hover:bg-[#e0e0e0]"
+            title="Column Visibility"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+              />
+            </svg>
+          </button>
+
+          {/* Compare Button */}
         <div className="relative" ref={compareDropdownRef}>
           <button
             onClick={handleCompareButtonClick}
@@ -396,27 +789,26 @@ export default function ComparisonTable() {
               />
             </svg>
             {comparisonApplied ? 'Clear Filter' : 'Compare'}
-            {selectedExchanges.size > 0 && (
-              <span className="ml-1">({selectedExchanges.size})</span>
+            {Object.values(rowSelection).filter(Boolean).length > 0 && (
+              <span className="ml-1">({Object.values(rowSelection).filter(Boolean).length})</span>
             )}
           </button>
 
           {/* Compare Dropdown */}
           {compareDropdownOpen && !comparisonApplied && (
             <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-[#eaeaea] rounded-lg shadow-lg z-50 p-4" onClick={(e) => e.stopPropagation()}>
-              {/* Search Input */}
               <input
                 type="text"
                 placeholder="Search exchanges..."
-                value={compareSearchTerm}
-                onChange={(e) => setCompareSearchTerm(e.target.value)}
+                value={globalFilter}
+                onChange={(e) => setGlobalFilter(e.target.value)}
                 className="w-full px-3 py-2 mb-3 border border-[#eaeaea] rounded text-[13px] focus:outline-none focus:ring-2 focus:ring-[#00a38f]"
               />
 
-              {/* Exchange List */}
               <div className="max-h-60 overflow-y-auto mb-3">
                 {filteredExchangesForDropdown.map((exchange) => {
-                  const isSelected = selectedExchanges.has(exchange.app_name);
+                  const isSelected = rowSelection[exchange.app_name] === true;
+                  const selectedCount = Object.values(rowSelection).filter(Boolean).length;
                   return (
                     <div
                       key={exchange.app_name}
@@ -427,7 +819,7 @@ export default function ComparisonTable() {
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => handleExchangeToggle(exchange.app_name)}
-                        disabled={!isSelected && selectedExchanges.size >= 7}
+                        disabled={!isSelected && selectedCount >= 7}
                         className="cursor-pointer"
                       />
                       <span className="text-[13px] text-gray-900 flex-1">
@@ -438,270 +830,110 @@ export default function ComparisonTable() {
                 })}
               </div>
 
-              {/* Apply Button */}
               <button
                 onClick={handleApplyComparison}
-                disabled={selectedExchanges.size === 0}
+                disabled={Object.values(rowSelection).filter(Boolean).length === 0}
                 className="w-full px-4 py-2 bg-[#2d2d2d] text-white rounded text-[13px] font-medium hover:bg-[#3a3a3a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Apply ({selectedExchanges.size}/7)
+                Apply ({Object.values(rowSelection).filter(Boolean).length}/7)
               </button>
             </div>
           )}
         </div>
+        </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto bg-white rounded border border-[#eaeaea]">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="bg-[#2d2d2d]">
-              {/* Rank Column Header */}
-              <th
-                onClick={() => handleSort('rank')}
-                className="text-xs font-semibold text-white tracking-wider border-t border-b border-l border-[#eaeaea] cursor-pointer hover:bg-[#3a3a3a] transition-colors relative sticky left-0 z-30 bg-[#2d2d2d] px-1 py-3 text-center"
-                style={{
-                  height: '48px',
-                  width: '40px',
-                  minWidth: '40px',
-                  maxWidth: '40px',
-                  boxShadow: '2px 0 8px 0 rgba(0,0,0,0.15)',
-                }}
-              >
-                <div className="flex items-center justify-center">
-                  <span>#</span>
-                  {sortState.column === 'rank' && (
-                    <span className="ml-0.5 text-[10px]">
-                      {sortState.direction === 'asc' ? '▲' : '▼'}
+      {/* Column Visibility Modal */}
+      <Dialog open={columnVisibilityModalOpen} onClose={() => setColumnVisibilityModalOpen(false)} className="relative z-50">
+        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <Dialog.Panel className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <Dialog.Title className="text-lg font-semibold mb-4">Column Visibility</Dialog.Title>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {table.getAllColumns()
+                .filter(column => column.getCanHide() && column.id !== 'app_name' && column.id !== 'website')
+                .map((column) => (
+                  <label key={column.id} className="flex items-center gap-2 py-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={column.getIsVisible()}
+                      onChange={() => column.toggleVisibility()}
+                      className="cursor-pointer"
+                    />
+                    <span className="text-[13px] text-gray-900">
+                      {column.id === 'rank' 
+                        ? 'Ranking'
+                        : typeof column.columnDef.header === 'string' 
+                        ? column.columnDef.header 
+                        : column.id}
                     </span>
-                  )}
-                </div>
-              </th>
-              {columns.map((column) => {
-                const isSorted = sortState.column === column.key;
-                const isAsc = sortState.direction === 'asc';
-                const isFirstColumn = column.key === 'app_name';
-                const isHacksColumn = column.key === 'hacks_or_incidents';
-                const isIncidentsColumn = column.key === 'other_incidents';
-                return (
-                  <th
-                    key={column.key}
-                    onClick={() => handleSort(column.key)}
-                    className={`text-xs font-semibold text-white tracking-wider border border-[#eaeaea] cursor-pointer hover:bg-[#3a3a3a] transition-colors relative ${
-                      isFirstColumn
-                        ? 'sticky left-[40px] z-20 bg-[#2d2d2d] px-2 py-3'
-                        : 'px-2 py-3'
-                    }`}
-                    style={{
-                      height: '48px',
-                      ...(isFirstColumn && {
-                        width: '175px',
-                        minWidth: '175px',
-                        maxWidth: '175px',
-                        boxShadow: '2px 0 4px -2px rgba(0,0,0,0.15)',
-                      }),
-                      ...((isHacksColumn || isIncidentsColumn) && {
-                        minWidth: '120px',
-                        width: 'auto',
-                      }),
-                    }}
-                  >
-                    <div className={`flex items-center ${isFirstColumn ? 'justify-start' : 'justify-center'}`}>
-                      <span>{column.label}</span>
-                      {isSorted && (
-                        <span className="ml-1 text-[10px]">
-                          {isAsc ? '▲' : '▼'}
-                        </span>
-                      )}
-                    </div>
-                  </th>
-                );
-              })}
-              <th
-                className="px-2 py-3 text-xs font-semibold text-white tracking-wider border border-[#eaeaea] text-center"
-                style={{ height: '48px' }}
+                  </label>
+                ))}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  table.getAllColumns().forEach(col => {
+                    if (col.getCanHide() && col.id !== 'app_name' && col.id !== 'website') {
+                      col.toggleVisibility(true);
+                    }
+                  });
+                }}
+                className="px-4 py-2 text-[13px] text-gray-700 hover:bg-gray-100 rounded transition-colors"
               >
-                Website
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedExchanges.map((exchange, idx) => (
-              <tr key={idx} className="group bg-white hover:bg-[#f0f0f0] transition-colors duration-75 border-b border-[#eaeaea]">
-                {/* Rank Column Cell */}
-                <td
-                  className="sticky left-0 z-20 bg-white group-hover:!bg-[#f0f0f0] px-1 py-1.5 whitespace-nowrap text-[13px] border-t border-b border-l border-[#eaeaea] transition-colors duration-75 text-center"
-                  style={{
-                    width: '40px',
-                    minWidth: '40px',
-                    maxWidth: '40px',
-                    boxShadow: '2px 0 8px 0 rgba(0,0,0,0.15)',
-                    color: '#000000',
-                  }}
-                >
-                  {getExchangeRank(exchange.app_name)}
-                </td>
-                {columns.map((column) => {
-                  const isFirstColumn = column.key === 'app_name';
-                  const isHacksColumn = column.key === 'hacks_or_incidents';
-                  const isIncidentsColumn = column.key === 'other_incidents';
-                  const isProofOfReservesColumn = column.key === 'proof_of_reserves';
-                  const isInsurancePolicyColumn = column.key === 'insurance_policy';
-                  
-                  // Determine cell content
-                  let cellContent;
-                  if (isFirstColumn) {
-                    cellContent = <div className="text-left">{renderNameCell(exchange)}</div>;
-                  } else if (isHacksColumn) {
-                    cellContent = (
-                      <div className="text-center">
-                        <IncidentBadge
-                          value={String(exchange.hacks_or_incidents || 'No')}
-                          url={exchange.hacks_or_incidents_url}
-                          type="hack"
-                        />
-                      </div>
-                    );
-                  } else if (isIncidentsColumn) {
-                    cellContent = (
-                      <div className="text-center">
-                        <IncidentBadge
-                          value={String(exchange.other_incidents || 'No')}
-                          url={exchange.other_incidents_url}
-                          type="incident"
-                        />
-                      </div>
-                    );
-                  } else if (isProofOfReservesColumn) {
-                    const rawValue = exchange.proof_of_reserves;
-                    const value = formatCellValue(rawValue);
-                    const url = exchange.proof_of_reserves_url;
-                    const shouldBeLink = (rawValue === true || rawValue === 'Yes') && url;
-                    
-                    if (shouldBeLink) {
-                      cellContent = (
-                        <div className="text-center">
-                          <PreviewLinkCard href={url}>
-                            <PreviewLinkCardTrigger
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[#00a38f] hover:underline"
-                            >
-                              {value}
-                            </PreviewLinkCardTrigger>
-                            <PreviewLinkCardContent 
-                              side="top" 
-                              align="center" 
-                              sideOffset={8}
-                              className="p-0 bg-white border border-gray-200 shadow-xl max-w-xs overflow-hidden"
-                              style={{ zIndex: 99999 }}
-                            >
-                              <div className="relative">
-                                <PreviewLinkCardImage 
-                                  alt="Link preview" 
-                                  className="w-full h-auto max-h-32 object-cover"
-                                />
-                                <div className="p-3 bg-white border-t border-gray-200">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-xs font-medium text-gray-900 truncate">
-                                        {new URL(url).hostname.replace('www.', '')}
-                                      </p>
-                                      <p className="text-xs text-gray-500 truncate mt-0.5">
-                                        {url.length > 50 ? `${url.substring(0, 50)}...` : url}
-                                      </p>
-                                    </div>
-                                    <svg 
-                                      className="w-4 h-4 text-gray-400 flex-shrink-0" 
-                                      fill="none" 
-                                      stroke="currentColor" 
-                                      viewBox="0 0 24 24"
-                                      aria-hidden="true"
-                                    >
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                    </svg>
-                                  </div>
-                                </div>
-                              </div>
-                            </PreviewLinkCardContent>
-                          </PreviewLinkCard>
-                        </div>
-                      );
-                    } else {
-                      cellContent = <div className="text-center">{value}</div>;
-                    }
-                  } else if (isInsurancePolicyColumn) {
-                    const rawValue = exchange.insurance_policy;
-                    const value = formatCellValue(rawValue);
-                    const url = exchange.insurance_policy_url;
-                    const shouldBeLink = (rawValue !== false && rawValue !== 'No' && rawValue !== 'no') && url;
-                    
-                    if (shouldBeLink) {
-                      cellContent = (
-                        <div className="text-center">
-                          <PreviewLinkCard href={url}>
-                            <PreviewLinkCardTrigger
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[#00a38f] hover:underline"
-                            >
-                              {value}
-                            </PreviewLinkCardTrigger>
-                            <PreviewLinkCardContent 
-                              side="top" 
-                              align="center" 
-                              sideOffset={8}
-                              className="p-0 bg-white border border-gray-200 shadow-xl max-w-xs overflow-hidden"
-                              style={{ zIndex: 99999 }}
-                            >
-                              <div className="relative">
-                                <PreviewLinkCardImage 
-                                  alt="Link preview" 
-                                  className="w-full h-auto max-h-32 object-cover"
-                                />
-                                <div className="p-3 bg-white border-t border-gray-200">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-xs font-medium text-gray-900 truncate">
-                                        {new URL(url).hostname.replace('www.', '')}
-                                      </p>
-                                      <p className="text-xs text-gray-500 truncate mt-0.5">
-                                        {url.length > 50 ? `${url.substring(0, 50)}...` : url}
-                                      </p>
-                                    </div>
-                                    <svg 
-                                      className="w-4 h-4 text-gray-400 flex-shrink-0" 
-                                      fill="none" 
-                                      stroke="currentColor" 
-                                      viewBox="0 0 24 24"
-                                      aria-hidden="true"
-                                    >
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                    </svg>
-                                  </div>
-                                </div>
-                              </div>
-                            </PreviewLinkCardContent>
-                          </PreviewLinkCard>
-                        </div>
-                      );
-                    } else {
-                      cellContent = <div className="text-center">{value}</div>;
-                    }
-                  } else {
-                    cellContent = <div className="text-center">{formatCellValue(exchange[column.key as keyof Exchange])}</div>;
-                  }
+                Show All
+              </button>
+              <button
+                onClick={() => setColumnVisibilityModalOpen(false)}
+                className="px-4 py-2 bg-[#2d2d2d] text-white rounded text-[13px] font-medium hover:bg-[#3a3a3a] transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </Dialog.Panel>
+        </div>
+      </Dialog>
+
+      {/* Table */}
+      <div className="bg-white rounded border border-[#eaeaea]">
+        <div 
+          ref={tableContainerRef}
+          className="overflow-x-auto"
+        >
+          <table className="w-full border-collapse">
+          <thead className="sticky top-0 z-40 overflow-visible">
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id} className="bg-[#2d2d2d]" style={{ height: '48px' }}>
+                {headerGroup.headers.map((header, idx) => {
+                  const isRankColumn = header.id === 'rank';
+                  const isNameColumn = header.id === 'app_name';
+                  const isHacksColumn = header.id === 'hacks_or_incidents';
+                  const isIncidentsColumn = header.id === 'other_incidents';
+                  const canSort = header.column.getCanSort();
+                  const sortDirection = header.column.getIsSorted();
                   
                   return (
-                    <td
-                      key={column.key}
-                      className={`whitespace-nowrap text-[13px] border border-[#eaeaea] transition-colors duration-75 ${
-                        isFirstColumn
-                          ? 'sticky left-[40px] z-10 bg-white group-hover:!bg-[#f0f0f0] px-2 py-1.5'
-                          : 'px-2 py-1.5'
+                    <th
+                      key={header.id}
+                      onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
+                      className={`text-xs font-semibold text-white tracking-wider border border-[#eaeaea] ${
+                        canSort ? 'cursor-pointer hover:bg-[#3a3a3a]' : ''
+                      } transition-colors relative overflow-visible ${
+                        isRankColumn
+                          ? 'sticky left-0 z-30 bg-[#2d2d2d] px-1 py-3 text-center'
+                          : isNameColumn
+                          ? 'sticky left-[40px] z-20 bg-[#2d2d2d] px-2 py-3'
+                          : 'px-2 py-3'
                       }`}
                       style={{
-                        ...(isFirstColumn && {
+                        height: '48px',
+                        ...(isRankColumn && {
+                          width: '40px',
+                          minWidth: '40px',
+                          maxWidth: '40px',
+                          boxShadow: '2px 0 8px 0 rgba(0,0,0,0.15)',
+                        }),
+                        ...(isNameColumn && {
                           width: '175px',
                           minWidth: '175px',
                           maxWidth: '175px',
@@ -711,142 +943,157 @@ export default function ComparisonTable() {
                           minWidth: '120px',
                           width: 'auto',
                         }),
-                        color: '#000000',
                       }}
                     >
-                      {cellContent}
-                    </td>
+                      <div className={`flex items-center ${isNameColumn ? 'justify-start' : 'justify-center'}`}>
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {sortDirection && (
+                          <span className="ml-1 text-[10px]">
+                            {sortDirection === 'asc' ? '▲' : '▼'}
+                          </span>
+                        )}
+                      </div>
+                    </th>
                   );
                 })}
-                <td
-                  className="px-2 py-1.5 whitespace-nowrap text-[13px] border border-[#eaeaea] text-center"
-                  style={{ color: '#000000' }}
-                >
-                  {exchange.website ? (
-                    <PreviewLinkCard href={exchange.website}>
-                      <PreviewLinkCardTrigger
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[#00a38f] hover:underline"
-                      >
-                        Visit →
-                      </PreviewLinkCardTrigger>
-                      <PreviewLinkCardContent 
-                        side="top" 
-                        align="center" 
-                        sideOffset={8}
-                        className="p-0 bg-white border border-gray-200 shadow-xl max-w-xs overflow-hidden"
-                        style={{ zIndex: 99999 }}
-                      >
-                        <div className="relative">
-                          <PreviewLinkCardImage 
-                            alt="Website preview" 
-                            className="w-full h-auto max-h-32 object-cover"
-                          />
-                          <div className="p-3 bg-white border-t border-gray-200">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-gray-900 truncate">
-                                  {new URL(exchange.website).hostname.replace('www.', '')}
-                                </p>
-                                <p className="text-xs text-gray-500 truncate mt-0.5">
-                                  {exchange.website.length > 50 ? `${exchange.website.substring(0, 50)}...` : exchange.website}
-                                </p>
-                              </div>
-                              <svg 
-                                className="w-4 h-4 text-gray-400 flex-shrink-0" 
-                                fill="none" 
-                                stroke="currentColor" 
-                                viewBox="0 0 24 24"
-                                aria-hidden="true"
-                              >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                              </svg>
-                            </div>
-                          </div>
-                        </div>
-                      </PreviewLinkCardContent>
-                    </PreviewLinkCard>
-                  ) : (
-                    <span className="text-gray-400">—</span>
-                  )}
-                </td>
               </tr>
             ))}
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.map((row) => {
+              return (
+                <tr 
+                  key={row.id} 
+                  className="group bg-white hover:bg-[#f0f0f0] transition-colors duration-75 border-b border-[#eaeaea]"
+                  data-exchange-name={row.original.app_name}
+                >
+                  {row.getVisibleCells().map((cell, idx) => {
+                    const isRankColumn = cell.column.id === 'rank';
+                    const isNameColumn = cell.column.id === 'app_name';
+                    const isHacksColumn = cell.column.id === 'hacks_or_incidents';
+                    const isIncidentsColumn = cell.column.id === 'other_incidents';
+                    
+                    return (
+                      <td
+                        key={cell.id}
+                        className={`whitespace-nowrap text-[13px] border border-[#eaeaea] transition-colors duration-75 ${
+                          isRankColumn
+                            ? 'sticky left-0 z-20 bg-white group-hover:!bg-[#f0f0f0] px-1 py-1.5 text-center'
+                            : isNameColumn
+                            ? 'sticky left-[40px] z-10 bg-white group-hover:!bg-[#f0f0f0] px-2 py-1.5'
+                            : 'px-2 py-1.5'
+                        }`}
+                        style={{
+                          ...(isRankColumn && {
+                            width: '40px',
+                            minWidth: '40px',
+                            maxWidth: '40px',
+                            boxShadow: '2px 0 8px 0 rgba(0,0,0,0.15)',
+                            color: '#000000',
+                          }),
+                          ...(isNameColumn && {
+                            width: '175px',
+                            minWidth: '175px',
+                            maxWidth: '175px',
+                            boxShadow: '2px 0 4px -2px rgba(0,0,0,0.15)',
+                            color: '#000000',
+                          }),
+                          ...((isHacksColumn || isIncidentsColumn) && {
+                            minWidth: '120px',
+                            width: 'auto',
+                          }),
+                          ...(!isRankColumn && !isNameColumn && {
+                            color: '#000000',
+                          }),
+                        }}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+        {loadingMore && (
+          <div className="text-center py-4 text-[13px] text-gray-600">
+            Loading more exchanges...
+          </div>
+        )}
+        </div>
       </div>
 
       {/* Pagination Footer */}
       {!comparisonApplied && (
         <div className="flex justify-between items-center mt-4 px-2 flex-wrap gap-4">
-        {/* Exchange Count */}
-        <div className="text-[13px] text-gray-600">
-          Showing {startIndex + 1} - {Math.min(endIndex, sortedExchanges.length)} out of {sortedExchanges.length}
-        </div>
-
-        {/* Pagination Controls */}
-        <div className="flex items-center gap-2">
-          {/* Previous Button */}
-          <button
-            onClick={() => handlePageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="px-3 py-1.5 border border-[#eaeaea] bg-white rounded text-[13px] text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            ←
-          </button>
-
-          {/* Page Numbers */}
-          <div className="flex items-center gap-1">
-            {getPageNumbers().map((page, idx) => {
-              if (page === '...') {
-                return (
-                  <span key={`ellipsis-${idx}`} className="px-2 text-gray-500">
-                    ...
-                  </span>
-                );
-              }
-              const pageNum = page as number;
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => handlePageChange(pageNum)}
-                  className={`px-3 py-1.5 border border-[#eaeaea] rounded text-[13px] transition-colors ${
-                    currentPage === pageNum
-                      ? 'bg-[#2d2d2d] text-white border-[#2d2d2d]'
-                      : 'bg-white text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              );
-            })}
+          {/* Exchange Count */}
+          <div className="text-[13px] text-gray-600">
+            Showing {startIndex + 1} - {Math.min(endIndex, totalRows)} out of {totalRows}
           </div>
 
-          {/* Next Button */}
-          <button
-            onClick={() => handlePageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className="px-3 py-1.5 border border-[#eaeaea] bg-white rounded text-[13px] text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            →
-          </button>
-        </div>
+          {/* Pagination Controls */}
+          <div className="flex items-center gap-2">
+            {/* Previous Button */}
+            <button
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+              className="px-2 py-1 border border-[#eaeaea] bg-white rounded text-[12px] text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              ←
+            </button>
 
-        {/* Items Per Page Dropdown */}
-        <div className="flex items-center gap-2 text-[13px] text-gray-600">
-          <span>Show</span>
-          <select
-            value={itemsPerPage}
-            onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
-            className="px-2 py-1.5 border border-[#eaeaea] rounded bg-white text-[13px] text-gray-700 cursor-pointer"
-          >
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-          </select>
+            {/* Page Numbers */}
+            <div className="flex items-center gap-1">
+              {getPageNumbers().map((page, idx) => {
+                if (page === '...') {
+                  return (
+                    <span key={`ellipsis-${idx}`} className="px-1 text-gray-500 text-[12px]">
+                      ...
+                    </span>
+                  );
+                }
+                const pageNum = page as number;
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => handlePageChange(pageNum)}
+                    className={`px-2 py-1 border border-[#eaeaea] rounded text-[12px] transition-colors ${
+                      currentPage === pageNum
+                        ? 'bg-[#2d2d2d] text-white border-[#2d2d2d]'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Next Button */}
+            <button
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+              className="px-2 py-1 border border-[#eaeaea] bg-white rounded text-[12px] text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              →
+            </button>
+          </div>
+
+          {/* Items Per Page Dropdown */}
+          <div className="flex items-center gap-2 text-[13px] text-gray-600">
+            <span>Show</span>
+            <select
+              value={pagination.pageSize}
+              onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+              className="px-2 py-1.5 border border-[#eaeaea] rounded bg-white text-[13px] text-gray-700 cursor-pointer"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
         </div>
-      </div>
       )}
     </div>
   );
