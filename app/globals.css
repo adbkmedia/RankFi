@@ -76,3 +76,32 @@ body {
 * {
   font-family: inherit;
 }
+
+/* ===============================
+   SKELETON LOADER
+   =============================== */
+.skeleton-loader {
+  height: 20px;
+  background: linear-gradient(
+    90deg,
+    var(--rankfi-light-gray) 25%,
+    var(--rankfi-hover-gray) 50%,
+    var(--rankfi-light-gray) 75%
+  );
+  background-size: 200% 100%;
+  animation: tableLoading 1.5s infinite;
+  border-radius: 4px;
+}
+
+@keyframes tableLoading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-row td {
+  padding: 10px;
+}
