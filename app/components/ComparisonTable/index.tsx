@@ -13,97 +13,41 @@ import {
   PaginationState,
   VisibilityState,
   RowSelectionState,
+  ColumnPinningState,
 } from '@tanstack/react-table';
 import { Dialog, Switch } from '@headlessui/react';
-import { Exchange } from '../types/exchange';
-import { exchanges } from '../data/exchanges';
-import { formatCellValue, getPlaceholderColor, getSortComparison, calculateDiscountedFee } from '../utils/tableHelpers';
-import IncidentBadge from './IncidentBadge';
-import Tooltip from './Tooltip';
-import TableTooltip from './TableTooltip';
+import { Exchange } from '../../types/exchange';
+import { exchanges } from '../../data/exchanges';
+import { formatCellValue, getPlaceholderColor, getSortComparison, calculateDiscountedFee } from '../../utils/tableHelpers';
+import { useHorizontalScroll } from '@/hooks/useHorizontalScroll';
+import IncidentBadge from '../IncidentBadge';
+import TableTooltip from '../TableTooltip';
+import { LinkPreviewCell } from '../LinkPreviewCell';
 import {
-  PreviewLinkCard,
-  PreviewLinkCardTrigger,
-  PreviewLinkCardContent,
-  PreviewLinkCardImage,
-} from '@/components/animate-ui/components/radix/preview-link-card';
-
-type FilterType = 'features' | 'fees' | 'security';
-
-// Rank assignment function - placeholder ranks
-const getExchangeRank = (exchangeName: string): number => {
-  const rankMap: Record<string, number> = {
-    'Kraken Pro': 1,
-    'Binance': 2,
-    'AscendEx': 3,
-  };
-  
-  if (rankMap[exchangeName]) {
-    return rankMap[exchangeName];
-  }
-  
-  const allExchanges = exchanges.map(e => e.app_name);
-  const rankedExchanges = ['Kraken Pro', 'Binance', 'AscendEx'];
-  const unrankedExchanges = allExchanges.filter(name => !rankedExchanges.includes(name));
-  
-  const index = unrankedExchanges.indexOf(exchangeName);
-  return index >= 0 ? index + 4 : 999;
-};
-
-// Column definitions matching your live site
-const columnDefinitions = {
-  features: [
-    { key: 'app_name', label: 'Name' },
-    { key: 'coins', label: '# of Coins' },
-    { key: 'number_of_futures', label: '# of Futures' },
-    { key: 'max_leverage', label: 'Max Leverage' },
-    { key: 'fiat_currencies', label: 'Fiat Currencies' },
-    { key: 'margin_spot', label: 'Max Margin (spot)' },
-    { key: 'copy_trading', label: 'Copy Trading' },
-    { key: 'trading_bots', label: 'Trading Bots' },
-    { key: 'p2p_trading', label: 'P2P Trading' },
-    { key: 'staking_or_earn', label: 'Staking or Earn' },
-    { key: 'mobile_app', label: 'Mobile App' },
-    { key: '247_support', label: '24/7 Support' },
-  ],
-  fees: [
-    { key: 'app_name', label: 'Name' },
-    { key: 'maker_fee', label: 'Maker Fee' },
-    { key: 'taker_fee', label: 'Taker Fee' },
-    { key: 'futures_maker_fee', label: 'Futures Maker Fee' },
-    { key: 'futures_taker_fee', label: 'Futures Taker Fee' },
-    { key: 'rankfi_discount', label: 'RankFi Discount' },
-    { key: 'rankfi_bonus', label: 'RankFi Bonus' },
-  ],
-  security: [
-    { key: 'app_name', label: 'Name' },
-    { key: 'founded', label: 'Founded' },
-    { key: 'number_of_users', label: '# of Users' },
-    { key: 'proof_of_reserves', label: 'Proof of Reserves' },
-    { key: 'uses_cold_storage', label: 'Uses Cold Storage' },
-    { key: 'insurance_policy', label: 'Insurance Policy' },
-    { key: 'hacks_or_incidents', label: 'Hacks' },
-    { key: 'other_incidents', label: 'Other Incidents' },
-    { key: '2fa', label: '2FA' },
-    { key: 'kyc', label: 'KYC' },
-    { key: 'publicly_traded', label: 'Publicly Traded' },
-    { key: 'headquarters', label: 'Headquarters' },
-  ],
-};
+  COLUMN_WIDTHS,
+  HEADER_HEIGHT,
+  STICKY_SHADOW,
+  FilterType,
+  columnDefinitions,
+  regions,
+  filters,
+  getExchangeRank,
+} from './constants';
 
 // Helper to render name cell with logo
 const renderNameCell = (exchange: Exchange) => {
   const placeholderColor = getPlaceholderColor(exchange.app_name);
 
   return (
-    <div className="flex items-center">
+    <div className="flex items-center overflow-hidden">
       <div
         className="w-5 h-5 rounded mr-2 shrink-0"
         style={{ backgroundColor: placeholderColor }}
       />
       <a
         href={`/cex/${exchange.app_name.toLowerCase().replace(/\s+/g, '-')}/`}
-        className="text-black font-bold hover:underline"
+        className="text-black font-bold hover:underline truncate block whitespace-nowrap"
+        style={{ maxWidth: 'calc(175px - 30px)' }}
       >
         {exchange.app_name}
       </a>
@@ -152,7 +96,6 @@ const rankSortingFn = (rowA: any, rowB: any, columnId: string) => {
 };
 
 // Custom sorting function using existing helper
-// Note: TanStack handles direction, so we always sort ascending here
 const customSortingFn = (rowA: any, rowB: any, columnId: string) => {
   const exchangeA = rowA.original as Exchange;
   const exchangeB = rowB.original as Exchange;
@@ -165,7 +108,7 @@ export default function ComparisonTable() {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'rank', desc: false }]);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
-    pageSize: 25, // Default to 25 rows
+    pageSize: 25,
   });
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -177,18 +120,20 @@ export default function ComparisonTable() {
   const compareDropdownRef = useRef<HTMLDivElement>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   
-  // Region selector state
   const [selectedRegion, setSelectedRegion] = useState<string>('global');
   const [regionDropdownOpen, setRegionDropdownOpen] = useState(false);
   const regionDropdownRef = useRef<HTMLDivElement>(null);
   
-  // Discount toggle state
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+  
   const [discountToggleEnabled, setDiscountToggleEnabled] = useState(false);
   
-  const regions = [
-    { id: 'global', label: '🌎 Global', url: '' },
-    { id: 'canada', label: '🇨🇦 Canada', url: '' },
-  ];
+  const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({
+    left: ['rank', 'app_name'],
+  });
+  
+  const canScrollHorizontally = useHorizontalScroll(tableContainerRef);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -205,46 +150,45 @@ export default function ComparisonTable() {
       ) {
         setRegionDropdownOpen(false);
       }
+      if (
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(event.target as Node)
+      ) {
+        setMobileMenuOpen(false);
+      }
     };
 
-    if (compareDropdownOpen || regionDropdownOpen) {
+    if (compareDropdownOpen || regionDropdownOpen || mobileMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [compareDropdownOpen, regionDropdownOpen]);
-
-  const filters = [
-    { id: 'features' as FilterType, label: 'Features' },
-    { id: 'fees' as FilterType, label: 'Fees' },
-    { id: 'security' as FilterType, label: 'Security' },
-  ];
+  }, [compareDropdownOpen, regionDropdownOpen, mobileMenuOpen]);
 
   // Build TanStack columns based on active filter
   const columns = useMemo<ColumnDef<Exchange>[]>(() => {
     const baseColumns: ColumnDef<Exchange>[] = [
-      // Rank column
       {
         id: 'rank',
         header: '#',
         enableSorting: true,
         enableHiding: true,
+        enablePinning: true,
         accessorFn: (row) => getExchangeRank(row.app_name),
         sortingFn: rankSortingFn,
         cell: ({ row }) => (
           <div className="text-center">{getExchangeRank(row.original.app_name)}</div>
         ),
-        size: 40,
-        minSize: 40,
-        maxSize: 40,
+        size: COLUMN_WIDTHS.rank,
+        minSize: COLUMN_WIDTHS.rank,
+        maxSize: COLUMN_WIDTHS.rank,
       },
     ];
 
     const filterColumns = columnDefinitions[activeFilter];
     
-    // Add columns based on active filter
     filterColumns.forEach((col) => {
       const isNameColumn = col.key === 'app_name';
       const isHacksColumn = col.key === 'hacks_or_incidents';
@@ -253,12 +197,12 @@ export default function ComparisonTable() {
       const isInsurancePolicyColumn = col.key === 'insurance_policy';
       const isDiscountColumn = col.key === 'rankfi_discount';
       const isFeeColumn = ['maker_fee', 'taker_fee', 'futures_maker_fee', 'futures_taker_fee'].includes(col.key);
-
       const columnDef: ColumnDef<Exchange> = {
         id: col.key,
         accessorKey: col.key,
         header: col.label,
         enableSorting: true,
+        enablePinning: isNameColumn,
         sortingFn: col.key === 'rank' ? rankSortingFn : customSortingFn,
         cell: ({ row }) => {
           const exchange = row.original;
@@ -338,50 +282,7 @@ export default function ComparisonTable() {
             if (shouldBeLink) {
               return (
                 <div className="text-center">
-                  <PreviewLinkCard href={url}>
-                    <PreviewLinkCardTrigger
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[#00a38f] hover:underline"
-                    >
-                      {value}
-                    </PreviewLinkCardTrigger>
-                    <PreviewLinkCardContent 
-                      side="top" 
-                      align="center" 
-                      sideOffset={8}
-                      className="p-0 bg-white border border-gray-200 shadow-xl max-w-xs overflow-hidden"
-                      style={{ zIndex: 99999 }}
-                    >
-                      <div className="relative">
-                        <PreviewLinkCardImage 
-                          alt="Link preview" 
-                          className="w-full h-auto max-h-32 object-cover"
-                        />
-                        <div className="p-3 bg-white border-t border-gray-200">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium text-gray-900 truncate">
-                                {new URL(url).hostname.replace('www.', '')}
-                              </p>
-                              <p className="text-xs text-gray-500 truncate mt-0.5">
-                                {url.length > 50 ? `${url.substring(0, 50)}...` : url}
-                              </p>
-                            </div>
-                            <svg 
-                              className="w-4 h-4 text-gray-400 flex-shrink-0" 
-                              fill="none" 
-                              stroke="currentColor" 
-                              viewBox="0 0 24 24"
-                              aria-hidden="true"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                            </svg>
-                          </div>
-                        </div>
-                      </div>
-                    </PreviewLinkCardContent>
-                  </PreviewLinkCard>
+                  <LinkPreviewCell url={url} label={value} />
                 </div>
               );
             } else {
@@ -396,68 +297,28 @@ export default function ComparisonTable() {
             if (shouldBeLink) {
               return (
                 <div className="text-center">
-                  <PreviewLinkCard href={url}>
-                    <PreviewLinkCardTrigger
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[#00a38f] hover:underline"
-                    >
-                      {value}
-                    </PreviewLinkCardTrigger>
-                    <PreviewLinkCardContent 
-                      side="top" 
-                      align="center" 
-                      sideOffset={8}
-                      className="p-0 bg-white border border-gray-200 shadow-xl max-w-xs overflow-hidden"
-                      style={{ zIndex: 99999 }}
-                    >
-                      <div className="relative">
-                        <PreviewLinkCardImage 
-                          alt="Link preview" 
-                          className="w-full h-auto max-h-32 object-cover"
-                        />
-                        <div className="p-3 bg-white border-t border-gray-200">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium text-gray-900 truncate">
-                                {new URL(url).hostname.replace('www.', '')}
-                              </p>
-                              <p className="text-xs text-gray-500 truncate mt-0.5">
-                                {url.length > 50 ? `${url.substring(0, 50)}...` : url}
-                              </p>
-                            </div>
-                            <svg 
-                              className="w-4 h-4 text-gray-400 flex-shrink-0" 
-                              fill="none" 
-                              stroke="currentColor" 
-                              viewBox="0 0 24 24"
-                              aria-hidden="true"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                            </svg>
-                          </div>
-                        </div>
-                      </div>
-                    </PreviewLinkCardContent>
-                  </PreviewLinkCard>
+                  <LinkPreviewCell url={url} label={value} />
                 </div>
               );
             } else {
               return <div className="text-center">{value}</div>;
             }
           } else {
-            return <div className="text-center">{formatCellValue(exchange[col.key as keyof Exchange])}</div>;
+            const hasTruncation = (col as any).maxSize && !['uses_cold_storage', 'publicly_traded'].includes(col.key);
+            return (
+              <div className={`text-center ${hasTruncation ? 'truncate overflow-hidden text-ellipsis whitespace-nowrap' : ''}`}>
+                {formatCellValue(exchange[col.key as keyof Exchange])}
+              </div>
+            );
           }
         },
-        size: isNameColumn ? 175 : undefined,
-        minSize: isNameColumn ? 175 : undefined,
-        maxSize: isNameColumn ? 175 : undefined,
+        size: (col as any).size || (isNameColumn ? COLUMN_WIDTHS.name : undefined),
+        minSize: (col as any).minSize || (isNameColumn ? COLUMN_WIDTHS.name : undefined),
+        maxSize: (col as any).maxSize || (isNameColumn ? COLUMN_WIDTHS.name : undefined),
       };
-
       baseColumns.push(columnDef);
     });
 
-    // Add Website column
     baseColumns.push({
       id: 'website',
       header: 'Website',
@@ -467,50 +328,7 @@ export default function ComparisonTable() {
         return (
           <div className="text-center">
             {exchange.website ? (
-              <PreviewLinkCard href={exchange.website}>
-                <PreviewLinkCardTrigger
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[#00a38f] hover:underline"
-                >
-                  Visit →
-                </PreviewLinkCardTrigger>
-                <PreviewLinkCardContent 
-                  side="top" 
-                  align="center" 
-                  sideOffset={8}
-                  className="p-0 bg-white border border-gray-200 shadow-xl max-w-xs overflow-hidden"
-                  style={{ zIndex: 99999 }}
-                >
-                  <div className="relative">
-                    <PreviewLinkCardImage 
-                      alt="Website preview" 
-                      className="w-full h-auto max-h-32 object-cover"
-                    />
-                    <div className="p-3 bg-white border-t border-gray-200">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-gray-900 truncate">
-                            {new URL(exchange.website).hostname.replace('www.', '')}
-                          </p>
-                          <p className="text-xs text-gray-500 truncate mt-0.5">
-                            {exchange.website.length > 50 ? `${exchange.website.substring(0, 50)}...` : exchange.website}
-                          </p>
-                        </div>
-                        <svg 
-                          className="w-4 h-4 text-gray-400 flex-shrink-0" 
-                          fill="none" 
-                          stroke="currentColor" 
-                          viewBox="0 0 24 24"
-                          aria-hidden="true"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
-                </PreviewLinkCardContent>
-              </PreviewLinkCard>
+              <LinkPreviewCell url={exchange.website} label="Visit →" />
             ) : (
               <span className="text-gray-400">—</span>
             )}
@@ -522,7 +340,6 @@ export default function ComparisonTable() {
     return baseColumns;
   }, [activeFilter, discountToggleEnabled]);
 
-  // Filter exchanges based on comparison mode (using TanStack row selection)
   const filteredExchanges = useMemo(() => {
     if (comparisonApplied && Object.keys(rowSelection).length > 0) {
       const selectedNames = Object.keys(rowSelection).filter(key => rowSelection[key]);
@@ -533,8 +350,6 @@ export default function ComparisonTable() {
     return exchanges;
   }, [comparisonApplied, rowSelection]);
 
-
-  // Reset to page 1 when filter changes
   const handleFilterChange = (filter: FilterType) => {
     setActiveFilter(filter);
     setPagination((prev) => ({ ...prev, pageIndex: 0 }));
@@ -547,25 +362,27 @@ export default function ComparisonTable() {
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    enableColumnPinning: true,
     state: {
       sorting,
       pagination,
       columnVisibility,
       rowSelection,
       globalFilter,
+      columnPinning,
     },
     onSortingChange: setSorting,
     onPaginationChange: setPagination,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilter,
+    onColumnPinningChange: setColumnPinning,
     enableRowSelection: true,
     getRowId: (row) => row.app_name,
     manualSorting: false,
     manualPagination: false,
   });
 
-  // Comparison feature handlers (using TanStack row selection)
   const handleCompareButtonClick = () => {
     if (comparisonApplied) {
       setComparisonApplied(false);
@@ -579,14 +396,12 @@ export default function ComparisonTable() {
   const handleExchangeToggle = (exchangeName: string) => {
     const selectedCount = Object.values(rowSelection).filter(Boolean).length;
     if (rowSelection[exchangeName]) {
-      // Deselect
       setRowSelection((prev) => {
         const newSelection = { ...prev };
         delete newSelection[exchangeName];
         return newSelection;
       });
     } else {
-      // Select (max 7)
       if (selectedCount < 7) {
         setRowSelection((prev) => ({
           ...prev,
@@ -605,17 +420,14 @@ export default function ComparisonTable() {
     }
   };
 
-  // Use TanStack's filtered row model for dropdown
   const filteredExchangesForDropdown = table.getFilteredRowModel().rows.map(row => row.original);
 
-  // Pagination helpers
   const totalPages = table.getPageCount();
   const currentPage = pagination.pageIndex + 1;
   const startIndex = pagination.pageIndex * pagination.pageSize;
   const endIndex = startIndex + pagination.pageSize;
   const totalRows = filteredExchanges.length;
 
-  // Generate page numbers to display
   const getPageNumbers = () => {
     const pages: (number | string)[] = [];
     const total = totalPages;
@@ -627,22 +439,11 @@ export default function ComparisonTable() {
       }
     } else {
       pages.push(1);
-
       const start = Math.max(2, current - 1);
       const end = Math.min(total - 1, current + 1);
-
-      if (start > 2) {
-        pages.push('...');
-      }
-
-      for (let i = start; i <= end; i++) {
-        pages.push(i);
-      }
-
-      if (end < total - 1) {
-        pages.push('...');
-      }
-
+      if (start > 2) pages.push('...');
+      for (let i = start; i <= end; i++) pages.push(i);
+      if (end < total - 1) pages.push('...');
       pages.push(total);
     }
 
@@ -660,7 +461,6 @@ export default function ComparisonTable() {
     table.setPageIndex(0);
   };
 
-  // Infinite scroll handler
   useEffect(() => {
     const container = tableContainerRef.current;
     if (!container) return;
@@ -675,7 +475,6 @@ export default function ComparisonTable() {
         
         if (currentPageSize < totalRows) {
           setLoadingMore(true);
-          // Load 10 more rows
           setTimeout(() => {
             table.setPageSize(Math.min(currentPageSize + 10, totalRows));
             setLoadingMore(false);
@@ -713,9 +512,6 @@ export default function ComparisonTable() {
                     onClick={() => {
                       setSelectedRegion(region.id);
                       setRegionDropdownOpen(false);
-                      if (region.url) {
-                        // window.location.href = region.url;
-                      }
                     }}
                     className={`${
                       selectedRegion === region.id ? 'bg-gray-100' : 'hover:bg-gray-50'
@@ -728,19 +524,59 @@ export default function ComparisonTable() {
             )}
           </div>
           
-          {filters.map((filter) => (
+          {/* Desktop: Show all filter buttons */}
+          <div className="hidden md:flex gap-3">
+            {filters.map((filter) => (
+              <button
+                key={filter.id}
+                onClick={() => handleFilterChange(filter.id)}
+                className={`px-5 py-2 rounded-lg text-[13px] font-normal transition-colors cursor-pointer ${
+                  activeFilter === filter.id
+                    ? 'bg-[#2d2d2d] text-white'
+                    : 'bg-[#f0f0f0] text-black hover:bg-[#e0e0e0]'
+                }`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+          
+          {/* Mobile: Show dropdown */}
+          <div className="relative md:hidden" ref={mobileMenuRef}>
             <button
-              key={filter.id}
-              onClick={() => handleFilterChange(filter.id)}
-              className={`px-5 py-2 rounded-lg text-[13px] font-normal transition-colors cursor-pointer ${
-                activeFilter === filter.id
-                  ? 'bg-[#2d2d2d] text-white'
-                  : 'bg-[#f0f0f0] text-black hover:bg-[#e0e0e0]'
-              }`}
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="px-5 py-2 rounded-lg text-[13px] font-normal transition-colors cursor-pointer bg-[#f0f0f0] text-black hover:bg-[#e0e0e0] flex items-center gap-2"
+              style={{
+                backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")",
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 12px center',
+                backgroundSize: '16px',
+                paddingRight: '32px',
+              }}
             >
-              {filter.label}
+              {filters.find(f => f.id === activeFilter)?.label || 'Features'}
             </button>
-          ))}
+            
+            {mobileMenuOpen && (
+              <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-md z-50">
+                {filters.map((filter) => (
+                  <button
+                    key={filter.id}
+                    onClick={() => {
+                      handleFilterChange(filter.id);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`${
+                      activeFilter === filter.id ? 'bg-gray-100' : 'hover:bg-gray-50'
+                    } w-full text-left px-4 py-2 text-[13px] text-gray-700 transition-colors flex items-center gap-2`}
+                  >
+                    {activeFilter === filter.id && <span>✓</span>}
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -750,96 +586,71 @@ export default function ComparisonTable() {
             className="px-3 py-2 rounded-lg text-[13px] font-normal transition-colors cursor-pointer bg-[#f0f0f0] text-black hover:bg-[#e0e0e0]"
             title="Column Visibility"
           >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-              />
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
             </svg>
           </button>
 
           {/* Compare Button */}
-        <div className="relative" ref={compareDropdownRef}>
-          <button
-            onClick={handleCompareButtonClick}
-            className={`px-5 py-2 rounded-lg text-[13px] font-normal transition-colors cursor-pointer flex items-center gap-2 ${
-              comparisonApplied
-                ? 'bg-[#2d2d2d] text-white'
-                : 'bg-[#f0f0f0] text-black hover:bg-[#e0e0e0]'
-            }`}
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <div className="relative" ref={compareDropdownRef}>
+            <button
+              onClick={handleCompareButtonClick}
+              className={`px-5 py-2 rounded-lg text-[13px] font-normal transition-colors cursor-pointer flex items-center gap-2 ${
+                comparisonApplied
+                  ? 'bg-[#2d2d2d] text-white'
+                  : 'bg-[#f0f0f0] text-black hover:bg-[#e0e0e0]'
+              }`}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-              />
-            </svg>
-            {comparisonApplied ? 'Clear Filter' : 'Compare'}
-            {Object.values(rowSelection).filter(Boolean).length > 0 && (
-              <span className="ml-1">({Object.values(rowSelection).filter(Boolean).length})</span>
-            )}
-          </button>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              {comparisonApplied ? 'Clear Filter' : 'Compare'}
+              {Object.values(rowSelection).filter(Boolean).length > 0 && (
+                <span className="ml-1">({Object.values(rowSelection).filter(Boolean).length})</span>
+              )}
+            </button>
 
-          {/* Compare Dropdown */}
-          {compareDropdownOpen && !comparisonApplied && (
-            <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-[#eaeaea] rounded-lg shadow-lg z-50 p-4" onClick={(e) => e.stopPropagation()}>
-              <input
-                type="text"
-                placeholder="Search exchanges..."
-                value={globalFilter}
-                onChange={(e) => setGlobalFilter(e.target.value)}
-                className="w-full px-3 py-2 mb-3 border border-[#eaeaea] rounded text-[13px] focus:outline-none focus:ring-2 focus:ring-[#00a38f]"
-              />
-
-              <div className="max-h-60 overflow-y-auto mb-3">
-                {filteredExchangesForDropdown.map((exchange) => {
-                  const isSelected = rowSelection[exchange.app_name] === true;
-                  const selectedCount = Object.values(rowSelection).filter(Boolean).length;
-                  return (
-                    <div
-                      key={exchange.app_name}
-                      className="flex items-center gap-2 py-2 hover:bg-gray-50 cursor-pointer"
-                      onClick={() => handleExchangeToggle(exchange.app_name)}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => handleExchangeToggle(exchange.app_name)}
-                        disabled={!isSelected && selectedCount >= 7}
-                        className="cursor-pointer"
-                      />
-                      <span className="text-[13px] text-gray-900 flex-1">
-                        {exchange.app_name}
-                      </span>
-                    </div>
-                  );
-                })}
+            {compareDropdownOpen && !comparisonApplied && (
+              <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-[#eaeaea] rounded-lg shadow-lg z-50 p-4" onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="text"
+                  placeholder="Search exchanges..."
+                  value={globalFilter}
+                  onChange={(e) => setGlobalFilter(e.target.value)}
+                  className="w-full px-3 py-2 mb-3 border border-[#eaeaea] rounded text-[13px] focus:outline-none focus:ring-2 focus:ring-[#00a38f]"
+                />
+                <div className="max-h-60 overflow-y-auto mb-3">
+                  {filteredExchangesForDropdown.map((exchange) => {
+                    const isSelected = rowSelection[exchange.app_name] === true;
+                    const selectedCount = Object.values(rowSelection).filter(Boolean).length;
+                    return (
+                      <div
+                        key={exchange.app_name}
+                        className="flex items-center gap-2 py-2 hover:bg-gray-50 cursor-pointer"
+                        onClick={() => handleExchangeToggle(exchange.app_name)}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleExchangeToggle(exchange.app_name)}
+                          disabled={!isSelected && selectedCount >= 7}
+                          className="cursor-pointer"
+                        />
+                        <span className="text-[13px] text-gray-900 flex-1">{exchange.app_name}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <button
+                  onClick={handleApplyComparison}
+                  disabled={Object.values(rowSelection).filter(Boolean).length === 0}
+                  className="w-full px-4 py-2 bg-[#2d2d2d] text-white rounded text-[13px] font-medium hover:bg-[#3a3a3a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Apply ({Object.values(rowSelection).filter(Boolean).length}/7)
+                </button>
               </div>
-
-              <button
-                onClick={handleApplyComparison}
-                disabled={Object.values(rowSelection).filter(Boolean).length === 0}
-                className="w-full px-4 py-2 bg-[#2d2d2d] text-white rounded text-[13px] font-medium hover:bg-[#3a3a3a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Apply ({Object.values(rowSelection).filter(Boolean).length}/7)
-              </button>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -895,116 +706,166 @@ export default function ComparisonTable() {
       </Dialog>
 
       {/* Table */}
-      <div className="bg-white rounded border border-[#eaeaea]">
-        <div 
-          ref={tableContainerRef}
-          className="overflow-x-auto"
-        >
-          <table className="w-full border-collapse">
-          <thead className="sticky top-0 z-40 overflow-visible">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id} className="bg-[#2d2d2d]" style={{ height: '48px' }}>
-                {headerGroup.headers.map((header, idx) => {
-                  const isRankColumn = header.id === 'rank';
-                  const isNameColumn = header.id === 'app_name';
-                  const isHacksColumn = header.id === 'hacks_or_incidents';
-                  const isIncidentsColumn = header.id === 'other_incidents';
-                  const canSort = header.column.getCanSort();
-                  const sortDirection = header.column.getIsSorted();
-                  
-                  return (
-                    <th
-                      key={header.id}
-                      onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
-                      className={`text-xs font-semibold text-white tracking-wider border border-[#eaeaea] ${
-                        canSort ? 'cursor-pointer hover:bg-[#3a3a3a]' : ''
-                      } transition-colors relative overflow-visible ${
-                        isRankColumn
-                          ? 'sticky left-0 z-30 bg-[#2d2d2d] px-1 py-3 text-center'
-                          : isNameColumn
-                          ? 'sticky left-[40px] z-20 bg-[#2d2d2d] px-2 py-3'
-                          : 'px-2 py-3'
-                      }`}
-                      style={{
-                        height: '48px',
-                        ...(isRankColumn && {
-                          width: '40px',
-                          minWidth: '40px',
-                          maxWidth: '40px',
-                          boxShadow: '2px 0 8px 0 rgba(0,0,0,0.15)',
-                        }),
-                        ...(isNameColumn && {
-                          width: '175px',
-                          minWidth: '175px',
-                          maxWidth: '175px',
-                          boxShadow: '2px 0 4px -2px rgba(0,0,0,0.15)',
-                        }),
-                        ...((isHacksColumn || isIncidentsColumn) && {
-                          minWidth: '120px',
-                          width: 'auto',
-                        }),
-                      }}
-                    >
-                      <div className={`flex items-center ${isNameColumn ? 'justify-start' : 'justify-center'}`}>
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        {sortDirection && (
-                          <span className="ml-1 text-[10px]">
-                            {sortDirection === 'asc' ? '▲' : '▼'}
+      <div className="bg-white rounded overflow-hidden">
+        <div ref={tableContainerRef} className="overflow-x-auto" style={{ paddingLeft: 0, marginLeft: 0 }}>
+          <table className="w-full" style={{ marginLeft: 0, paddingLeft: 0, borderCollapse: 'separate', borderSpacing: 0 }}>
+            <thead className="sticky top-0 z-40" style={{ height: `${HEADER_HEIGHT}px`, display: 'table-header-group' }}>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <tr key={headerGroup.id} className="bg-[#2d2d2d]" style={{ height: `${HEADER_HEIGHT}px`, display: 'table-row', boxSizing: 'border-box' }}>
+                  {headerGroup.headers.map((header) => {
+                    const isRankColumn = header.id === 'rank';
+                    const isNameColumn = header.id === 'app_name';
+                    const isHacksColumn = header.id === 'hacks_or_incidents';
+                    const isIncidentsColumn = header.id === 'other_incidents';
+                    const isWrappableColumn = ['uses_cold_storage', 'publicly_traded'].includes(header.id);
+                    const canSort = header.column.getCanSort();
+                    const sortDirection = header.column.getIsSorted();
+                    const isPinned = header.column.getIsPinned();
+                    const pinnedIndex = header.column.getPinnedIndex();
+                    
+                    return (
+                      <th
+                        key={header.id}
+                        data-column-id={header.id}
+                        onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
+                        className={`text-xs font-medium text-white tracking-wider border-b border-gray-700 align-middle ${
+                          canSort ? 'cursor-pointer hover:bg-[#3a3a3a]' : ''
+                        } transition-colors relative ${
+                          isPinned === 'left' ? 'bg-[#2d2d2d]' : ''
+                        } ${
+                          isRankColumn ? 'px-1 text-center' : isNameColumn ? 'px-2 text-left' : 'px-2 text-center'
+                        }`}
+                        style={{
+                          height: `${HEADER_HEIGHT}px`,
+                          minHeight: `${HEADER_HEIGHT}px`,
+                          maxHeight: `${HEADER_HEIGHT}px`,
+                          verticalAlign: 'middle',
+                          paddingTop: '6px',
+                          paddingBottom: '6px',
+                          overflow: 'hidden',
+                          whiteSpace: 'normal',
+                          wordWrap: 'break-word',
+                          boxSizing: 'border-box',
+                          lineHeight: '1.2',
+                          ...(isPinned === 'left' && {
+                            position: 'sticky',
+                            left: pinnedIndex === 0 ? 0 : pinnedIndex === 1 ? `${COLUMN_WIDTHS.rank}px` : undefined,
+                            zIndex: isRankColumn ? 30 : isNameColumn ? 20 : 10,
+                            boxShadow: isNameColumn && canScrollHorizontally ? STICKY_SHADOW : 'none',
+                          }),
+                          ...(isRankColumn && {
+                            width: `${COLUMN_WIDTHS.rank}px`,
+                            minWidth: `${COLUMN_WIDTHS.rank}px`,
+                            maxWidth: `${COLUMN_WIDTHS.rank}px`,
+                            marginLeft: '-1px',
+                          }),
+                          ...(isNameColumn && {
+                            width: `${COLUMN_WIDTHS.name}px`,
+                            minWidth: `${COLUMN_WIDTHS.name}px`,
+                            maxWidth: `${COLUMN_WIDTHS.name}px`,
+                            paddingRight: '12px',
+                          }),
+                          ...((isHacksColumn || isIncidentsColumn) && { minWidth: '120px', width: 'auto' }),
+                          ...(header.column.columnDef.minSize && !isRankColumn && !isNameColumn && !isHacksColumn && !isIncidentsColumn && {
+                            minWidth: `${header.column.columnDef.minSize}px`,
+                            width: 'auto',
+                          }),
+                          ...(header.column.columnDef.maxSize && !isRankColumn && !isNameColumn && !isHacksColumn && !isIncidentsColumn && !isWrappableColumn && {
+                            maxWidth: `${header.column.columnDef.maxSize}px`,
+                            width: 'auto',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }),
+                          ...(header.column.columnDef.maxSize && !isRankColumn && !isNameColumn && !isHacksColumn && !isIncidentsColumn && isWrappableColumn && {
+                            maxWidth: `${header.column.columnDef.maxSize}px`,
+                            width: 'auto',
+                          }),
+                        }}
+                      >
+                        <div className={`flex items-center ${isNameColumn ? 'justify-start' : 'justify-center'} relative w-full`}>
+                          {canSort && (
+                            <span 
+                              className="text-[#999] absolute"
+                              style={{ fontSize: '7px', opacity: sortDirection ? 1 : 0, left: '-4px', top: '50%', transform: 'translateY(-50%)' }}
+                            >
+                              {sortDirection === 'asc' ? '▲' : sortDirection === 'desc' ? '▼' : '▲'}
+                            </span>
+                          )}
+                          <span className={isNameColumn ? 'text-left pl-4' : 'text-center w-full'}>
+                            {flexRender(header.column.columnDef.header, header.getContext())}
                           </span>
-                        )}
-                      </div>
-                    </th>
-                  );
-                })}
-              </tr>
-            ))}
-          </thead>
-          <tbody>
-            {table.getRowModel().rows.map((row) => {
-              return (
-                <tr 
-                  key={row.id} 
-                  className="group bg-white hover:bg-[#f0f0f0] transition-colors duration-75 border-b border-[#eaeaea]"
-                  data-exchange-name={row.original.app_name}
-                >
-                  {row.getVisibleCells().map((cell, idx) => {
+                        </div>
+                      </th>
+                    );
+                  })}
+                </tr>
+              ))}
+            </thead>
+            <tbody>
+              {table.getRowModel().rows.map((row) => (
+                <tr key={row.id} className="group bg-white hover:bg-[#f0f0f0] transition-colors duration-75 border-b border-gray-100" data-exchange-name={row.original.app_name}>
+                  {row.getVisibleCells().map((cell) => {
                     const isRankColumn = cell.column.id === 'rank';
                     const isNameColumn = cell.column.id === 'app_name';
                     const isHacksColumn = cell.column.id === 'hacks_or_incidents';
                     const isIncidentsColumn = cell.column.id === 'other_incidents';
+                    const isWrappableColumn = ['uses_cold_storage', 'publicly_traded'].includes(cell.column.id);
+                    const isPinned = cell.column.getIsPinned();
+                    const pinnedIndex = cell.column.getPinnedIndex();
                     
                     return (
                       <td
                         key={cell.id}
-                        className={`whitespace-nowrap text-[13px] border border-[#eaeaea] transition-colors duration-75 ${
-                          isRankColumn
-                            ? 'sticky left-0 z-20 bg-white group-hover:!bg-[#f0f0f0] px-1 py-1.5 text-center'
-                            : isNameColumn
-                            ? 'sticky left-[40px] z-10 bg-white group-hover:!bg-[#f0f0f0] px-2 py-1.5'
-                            : 'px-2 py-1.5'
+                        data-column-id={cell.column.id}
+                        className={`text-[13px] border-r border-b border-[#eaeaea] transition-colors duration-75 align-middle ${
+                          isPinned === 'left' ? 'bg-white group-hover:bg-[#f0f0f0]' : ''
+                        } ${
+                          isRankColumn ? 'px-1 py-1.5 text-center whitespace-nowrap'
+                            : isNameColumn ? 'px-2 py-1.5 overflow-hidden'
+                            : isWrappableColumn ? 'px-2 py-1.5 overflow-hidden'
+                            : 'px-2 py-1.5 whitespace-nowrap overflow-hidden text-ellipsis'
                         }`}
                         style={{
+                          verticalAlign: 'middle',
+                          ...(isPinned === 'left' && {
+                            position: 'sticky',
+                            left: pinnedIndex === 0 ? 0 : pinnedIndex === 1 ? `${COLUMN_WIDTHS.rank}px` : undefined,
+                            zIndex: isRankColumn ? 20 : isNameColumn ? 10 : 5,
+                            boxShadow: isNameColumn && canScrollHorizontally ? STICKY_SHADOW : 'none',
+                          }),
                           ...(isRankColumn && {
-                            width: '40px',
-                            minWidth: '40px',
-                            maxWidth: '40px',
-                            boxShadow: '2px 0 8px 0 rgba(0,0,0,0.15)',
+                            width: `${COLUMN_WIDTHS.rank}px`,
+                            minWidth: `${COLUMN_WIDTHS.rank}px`,
+                            maxWidth: `${COLUMN_WIDTHS.rank}px`,
                             color: '#000000',
+                            marginLeft: '-1px',
                           }),
                           ...(isNameColumn && {
-                            width: '175px',
-                            minWidth: '175px',
-                            maxWidth: '175px',
-                            boxShadow: '2px 0 4px -2px rgba(0,0,0,0.15)',
+                            width: `${COLUMN_WIDTHS.name}px`,
+                            minWidth: `${COLUMN_WIDTHS.name}px`,
+                            maxWidth: `${COLUMN_WIDTHS.name}px`,
                             color: '#000000',
+                            overflow: 'hidden',
+                            paddingRight: '12px',
                           }),
-                          ...((isHacksColumn || isIncidentsColumn) && {
-                            minWidth: '120px',
+                          ...((isHacksColumn || isIncidentsColumn) && { minWidth: '120px', width: 'auto' }),
+                          ...(cell.column.columnDef.minSize && !isRankColumn && !isNameColumn && !isHacksColumn && !isIncidentsColumn && {
+                            minWidth: `${cell.column.columnDef.minSize}px`,
                             width: 'auto',
                           }),
-                          ...(!isRankColumn && !isNameColumn && {
-                            color: '#000000',
+                          ...(cell.column.columnDef.maxSize && !isRankColumn && !isNameColumn && !isHacksColumn && !isIncidentsColumn && !isWrappableColumn && {
+                            maxWidth: `${cell.column.columnDef.maxSize}px`,
+                            width: 'auto',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
                           }),
+                          ...(cell.column.columnDef.maxSize && !isRankColumn && !isNameColumn && !isHacksColumn && !isIncidentsColumn && isWrappableColumn && {
+                            maxWidth: `${cell.column.columnDef.maxSize}px`,
+                            width: 'auto',
+                          }),
+                          ...(!isRankColumn && !isNameColumn && { color: '#000000' }),
                         }}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -1012,29 +873,22 @@ export default function ComparisonTable() {
                     );
                   })}
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {loadingMore && (
-          <div className="text-center py-4 text-[13px] text-gray-600">
-            Loading more exchanges...
-          </div>
-        )}
+              ))}
+            </tbody>
+          </table>
+          {loadingMore && (
+            <div className="text-center py-4 text-[13px] text-gray-600">Loading more exchanges...</div>
+          )}
         </div>
       </div>
 
       {/* Pagination Footer */}
       {!comparisonApplied && (
         <div className="flex justify-between items-center mt-4 px-2 flex-wrap gap-4">
-          {/* Exchange Count */}
           <div className="text-[13px] text-gray-600">
             Showing {startIndex + 1} - {Math.min(endIndex, totalRows)} out of {totalRows}
           </div>
-
-          {/* Pagination Controls */}
           <div className="flex items-center gap-2">
-            {/* Previous Button */}
             <button
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
@@ -1042,16 +896,10 @@ export default function ComparisonTable() {
             >
               ←
             </button>
-
-            {/* Page Numbers */}
             <div className="flex items-center gap-1">
               {getPageNumbers().map((page, idx) => {
                 if (page === '...') {
-                  return (
-                    <span key={`ellipsis-${idx}`} className="px-1 text-gray-500 text-[12px]">
-                      ...
-                    </span>
-                  );
+                  return <span key={`ellipsis-${idx}`} className="px-1 text-gray-500 text-[12px]">...</span>;
                 }
                 const pageNum = page as number;
                 return (
@@ -1069,8 +917,6 @@ export default function ComparisonTable() {
                 );
               })}
             </div>
-
-            {/* Next Button */}
             <button
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
@@ -1079,8 +925,6 @@ export default function ComparisonTable() {
               →
             </button>
           </div>
-
-          {/* Items Per Page Dropdown */}
           <div className="flex items-center gap-2 text-[13px] text-gray-600">
             <span>Show</span>
             <select
