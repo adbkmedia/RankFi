@@ -59,7 +59,7 @@ export default function IncidentBadge({ value, url, type }: IncidentBadgeProps) 
         
         const badgeContent = (
           <span
-            className={`inline-block px-2 py-1 rounded text-[13px] font-medium transition-colors ${badgeClasses}`}
+            className={`inline-block px-2 py-0.5 rounded text-[13px] font-medium transition-colors ${badgeClasses}`}
           >
             {val}
           </span>

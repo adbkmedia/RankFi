@@ -86,6 +86,9 @@
 - User accounts (if needed)
 - Analytics integration
 
+**Future Considerations**:
+- **Airtable Integration for Page Metadata**: Move page titles, descriptions, and other page-specific content from hardcoded values in `frontend/app/page.tsx` to Airtable. This will be necessary when launching dozens or hundreds of comparison pages, allowing content to be managed centrally without code changes for each new page.
+
 ## 📚 Library Integration Plan
 
 ### Current Libraries

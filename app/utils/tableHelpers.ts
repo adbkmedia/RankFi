@@ -59,13 +59,33 @@ export const getSortComparison = (
     // Integer columns
     const intColumns = ['coins', 'number_of_futures', 'max_leverage', 'margin_spot', 'founded', 'fiat_currencies'];
     if (intColumns.includes(column)) {
-      // Handle strings like "300+" or "1M"
-      const numA = typeof valueA === 'string' 
-        ? parseInt(valueA.replace(/[^0-9]/g, '')) || 0
-        : parseInt(String(valueA)) || 0;
-      const numB = typeof valueB === 'string'
-        ? parseInt(valueB.replace(/[^0-9]/g, '')) || 0
-        : parseInt(String(valueB)) || 0;
+      // Parse integer values with support for "300+", "1M", "1B", "1K" formats
+      const parseIntValue = (val: any): number => {
+        if (typeof val === 'number') return val;
+        const str = String(val).trim();
+        
+        // Handle "300+" format
+        const plusMatch = str.match(/^(\d+)\+?$/);
+        if (plusMatch) return parseInt(plusMatch[1]);
+        
+        // Handle "1M", "1B", "1K" format
+        const suffixMatch = str.match(/^([\d.]+)([MBK])?$/i);
+        if (suffixMatch) {
+          const num = parseFloat(suffixMatch[1]);
+          const suffix = suffixMatch[2]?.toUpperCase();
+          if (suffix === 'M') return num * 1000000;
+          if (suffix === 'B') return num * 1000000000;
+          if (suffix === 'K') return num * 1000;
+          return num;
+        }
+        
+        // Fallback: extract all digits
+        const digits = str.replace(/[^0-9]/g, '');
+        return digits ? parseInt(digits) : 0;
+      };
+      
+      const numA = parseIntValue(valueA);
+      const numB = parseIntValue(valueB);
       return directionMultiplier * (numA - numB);
     }
 
@@ -82,13 +102,61 @@ export const getSortComparison = (
       return directionMultiplier * (numA - numB);
     }
 
-    // Boolean columns
-    if (typeof valueA === 'boolean' && typeof valueB === 'boolean') {
-      return directionMultiplier * (valueA === valueB ? 0 : valueA ? 1 : -1);
+    // Boolean columns - handle both actual booleans and Yes/No strings
+    const boolColumns = ['copy_trading', 'trading_bots', 'p2p_trading', 'staking_or_earn', 'mobile_app', '247_support', 'proof_of_reserves', 'uses_cold_storage', 'insurance_policy', '2fa', 'kyc', 'publicly_traded'];
+    if (boolColumns.includes(column)) {
+      const parseBoolean = (val: any): boolean => {
+        if (typeof val === 'boolean') return val;
+        const str = String(val).toLowerCase().trim();
+        return str === 'yes' || str === 'true' || str === '1';
+      };
+      
+      const boolA = parseBoolean(valueA);
+      const boolB = parseBoolean(valueB);
+      return directionMultiplier * (boolA === boolB ? 0 : boolA ? 1 : -1);
     }
 
     // String columns (default)
     return directionMultiplier * String(valueA).trim().localeCompare(String(valueB).trim());
   };
+};
+
+// Extract numeric value from fee string (handles "0.10%" or "0.10% to 0.20%")
+const extractFeeValue = (feeString: string): number | null => {
+  if (!feeString || feeString === 'N/A') return null;
+  const match = feeString.match(/[\d.]+/);
+  return match ? parseFloat(match[0]) : null;
+};
+
+// Calculate discounted fee
+export const calculateDiscountedFee = (fee: string, discountPercent: string): string => {
+  if (!fee || fee === 'N/A' || !discountPercent) return fee;
+  
+  // Extract discount percentage
+  const discountMatch = discountPercent.match(/[\d.]+/);
+  if (!discountMatch) return fee;
+  const discount = parseFloat(discountMatch[0]) / 100; // Convert to decimal (e.g., 10% -> 0.1)
+  
+  // Check if fee is a range (e.g., "0.10% to 0.20%")
+  if (fee.includes(' to ')) {
+    const parts = fee.split(' to ');
+    const minFee = extractFeeValue(parts[0]);
+    const maxFee = extractFeeValue(parts[1]);
+    
+    if (minFee !== null && maxFee !== null) {
+      const discountedMin = (minFee * (1 - discount)).toFixed(2);
+      const discountedMax = (maxFee * (1 - discount)).toFixed(2);
+      return `${discountedMin}% to ${discountedMax}%`;
+    }
+  } else {
+    // Single value
+    const feeValue = extractFeeValue(fee);
+    if (feeValue !== null) {
+      const discounted = (feeValue * (1 - discount)).toFixed(2);
+      return `${discounted}%`;
+    }
+  }
+  
+  return fee; // Return original if we can't parse
 };
 

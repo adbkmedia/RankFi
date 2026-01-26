@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",
+    "@tanstack/react-table": "^8.21.3",
     "clsx": "^2.1.1",
     "motion": "^12.26.2",
     "next": "16.1.2",

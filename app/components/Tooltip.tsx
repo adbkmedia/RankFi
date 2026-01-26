@@ -26,6 +26,7 @@ interface TooltipProps {
   position?: 'top' | 'bottom';
   align?: 'left' | 'right' | 'auto';
   variant?: 'default' | 'info' | 'warning';
+  zIndex?: number;
 }
 
 const variantStyles = {
@@ -64,6 +65,7 @@ export default function Tooltip({
   position = 'top',
   align = 'auto',
   variant = 'default',
+  zIndex = 50,
 }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [adjustedPosition, setAdjustedPosition] = useState<{ top?: number; left?: number; right?: number }>({});
@@ -99,7 +101,7 @@ export default function Tooltip({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
-    };
+      };
   }, [isVisible]);
 
   // Viewport edge detection to prevent overflow
@@ -137,7 +139,7 @@ export default function Tooltip({
       } else if (tooltipRect.top < padding) {
         // Overflowing top - adjust to fit below
         adjustments.top = padding;
-      }
+    }
 
       setAdjustedPosition(adjustments);
     };
@@ -170,10 +172,11 @@ export default function Tooltip({
           ref={tooltipRef}
           className={`absolute ${
             position === 'top' ? 'bottom-full pb-1' : 'top-full pt-1'
-          } ${alignment.tooltip} w-64 max-w-[calc(100vw-2rem)] ${styles.bg} ${styles.text} text-xs rounded-lg shadow-xl z-50`}
+          } ${alignment.tooltip} w-64 max-w-[calc(100vw-2rem)] ${styles.bg} ${styles.text} text-xs rounded-lg shadow-xl`}
           style={{
             padding: '12px',
             paddingBottom: '12px',
+            zIndex: zIndex,
             ...adjustedPosition,
           }}
         >
@@ -185,14 +188,14 @@ export default function Tooltip({
               className="block"
               style={{ marginTop: '0px', marginBottom: '0px', paddingTop: '0px', paddingBottom: '0px' }}
             >
-              <Link
-                href={linkUrl}
+            <Link
+              href={linkUrl}
                 className={`${styles.link} font-medium leading-normal`}
                 style={{ margin: '0', padding: '0', display: 'inline-block' }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {linkText} →
-              </Link>
+              onClick={(e) => e.stopPropagation()}
+            >
+              {linkText} →
+            </Link>
             </div>
           )}
           {/* Tooltip Arrow */}
