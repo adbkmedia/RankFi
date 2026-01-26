@@ -2,7 +2,8 @@
 
 import { Menu, Dialog, TabGroup, TabList, Tab, TabPanels, TabPanel, Disclosure } from '@headlessui/react';
 import { useState } from 'react';
-import FilterButton from './FilterButton';
+import FilterButton from '../FilterButton';
+import TableHeaderVariant from './TableHeaderVariant';
 
 export default function StyleGuide() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -413,6 +414,21 @@ export default function StyleGuide() {
               </Disclosure>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* CoinMarketCap Style Table */}
+      <section>
+        <h2 className="text-2xl font-bold mb-6 text-gray-900">CoinMarketCap Style Table</h2>
+        <p className="text-sm text-gray-600 mb-6">
+          Modern, clean design inspired by CoinMarketCap with borderless rows, subtle alternating backgrounds, tooltip icons, sorting, and exchange logos. Shows full features table with all exchanges.
+        </p>
+        <div className="w-full">
+          <TableHeaderVariant
+            variant="coinmarketcap"
+            title="CoinMarketCap Style"
+            description="Modern, clean design inspired by CoinMarketCap with borderless rows, subtle alternating backgrounds, and tooltip icons on relevant columns. Shows full features table with all exchanges."
+          />
         </div>
       </section>
 
