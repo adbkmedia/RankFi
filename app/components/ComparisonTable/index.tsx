@@ -15,7 +15,7 @@ import {
   RowSelectionState,
   ColumnPinningState,
 } from '@tanstack/react-table';
-import { Dialog, Switch } from '@headlessui/react';
+import { Dialog, Switch, TabGroup, TabList, Tab } from '@headlessui/react';
 import { Exchange } from '../../types/exchange';
 import { exchanges } from '../../data/exchanges';
 import { formatCellValue, getPlaceholderColor, getSortComparison, calculateDiscountedFee } from '../../utils/tableHelpers';
@@ -525,20 +525,28 @@ export default function ComparisonTable() {
           </div>
           
           {/* Desktop: Show all filter buttons */}
-          <div className="hidden md:flex gap-3">
-            {filters.map((filter) => (
-              <button
-                key={filter.id}
-                onClick={() => handleFilterChange(filter.id)}
-                className={`px-5 py-2 rounded-lg text-[13px] font-normal transition-colors cursor-pointer ${
-                  activeFilter === filter.id
-                    ? 'bg-[#2d2d2d] text-white'
-                    : 'bg-[#f0f0f0] text-black hover:bg-[#e0e0e0]'
-                }`}
-              >
-                {filter.label}
-              </button>
-            ))}
+          <div className="hidden md:flex">
+            <TabGroup 
+              selectedIndex={filters.findIndex(f => f.id === activeFilter)}
+              onChange={(index) => handleFilterChange(filters[index].id)}
+            >
+              <TabList className="bg-[#EFEFEF] rounded-lg px-1 py-0.5 gap-0.5 flex">
+                {filters.map((filter) => (
+                  <Tab
+                    key={filter.id}
+                    className={({ selected }) =>
+                      `px-5 rounded-md text-[13px] font-medium transition-all focus:outline-none focus:ring-0 ${
+                        selected
+                          ? 'bg-white text-black shadow-sm py-[5px]'
+                          : 'text-gray-600 hover:text-gray-800 py-1.5'
+                      }`
+                    }
+                  >
+                    {filter.label}
+                  </Tab>
+                ))}
+              </TabList>
+            </TabGroup>
           </div>
           
           {/* Mobile: Show dropdown */}
