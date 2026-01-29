@@ -168,9 +168,10 @@ const CheckmarkX = ({ value, style = 'icon-only', badgeColorVariant = 'darker' }
 };
 
 // Helper to create header with tooltip for coinmarketcap variant
+// Returns a function to satisfy TanStack Table's ColumnDefTemplate type
 const createHeaderWithTooltip = (label: string, tooltipContent: string, variant: HeaderVariant) => {
   if (variant === 'coinmarketcap') {
-    return (
+    return () => (
       <div className="flex items-center gap-1.5">
         <span>{label}</span>
         <TableTooltip
@@ -372,24 +373,22 @@ export default function TableHeaderVariant({ variant, title, description }: Tabl
         }
       );
     } else {
-      // Simplified columns for other variants
+      // Simplified columns for other variants (non-coinmarketcap)
       baseColumns.push(
         {
           id: 'coins',
-          header: variant === 'coinmarketcap' ? createHeaderWithTooltip('# of Coins', 'Total number of cryptocurrencies supported by this exchange', variant) : '# of Coins',
-          enableSorting: variant === 'coinmarketcap',
+          header: '# of Coins',
+          enableSorting: false,
           accessorKey: 'coins',
-          sortingFn: variant === 'coinmarketcap' ? customSortingFn : undefined,
           cell: ({ row }) => (
             <div className="text-center">{formatCellValue(row.original.coins)}</div>
           ),
         },
         {
           id: 'max_leverage',
-          header: variant === 'coinmarketcap' ? createHeaderWithTooltip('Max Leverage', 'Maximum leverage multiplier available for trading on this exchange', variant) : 'Max Leverage',
-          enableSorting: variant === 'coinmarketcap',
+          header: 'Max Leverage',
+          enableSorting: false,
           accessorKey: 'max_leverage',
-          sortingFn: variant === 'coinmarketcap' ? customSortingFn : undefined,
           cell: ({ row }) => (
             <div className="text-center">{formatCellValue(row.original.max_leverage)}</div>
           ),
@@ -397,19 +396,17 @@ export default function TableHeaderVariant({ variant, title, description }: Tabl
         {
           id: 'mobile_app',
           header: 'Mobile App',
-          enableSorting: variant === 'coinmarketcap',
+          enableSorting: false,
           accessorKey: 'mobile_app',
-          sortingFn: variant === 'coinmarketcap' ? customSortingFn : undefined,
           cell: ({ row }) => (
             <div className="text-center">{formatCellValue(row.original.mobile_app)}</div>
           ),
         },
         {
           id: '247_support',
-          header: variant === 'coinmarketcap' ? createHeaderWithTooltip('24/7 Support', 'Whether the exchange provides round-the-clock customer support', variant) : '24/7 Support',
-          enableSorting: variant === 'coinmarketcap',
+          header: '24/7 Support',
+          enableSorting: false,
           accessorKey: '247_support',
-          sortingFn: variant === 'coinmarketcap' ? customSortingFn : undefined,
           cell: ({ row }) => (
             <div className="text-center">{formatCellValue(row.original['247_support'])}</div>
           ),

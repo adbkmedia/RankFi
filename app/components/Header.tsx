@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import {
   Menu,
   X,
@@ -177,10 +178,13 @@ export default function Header() {
         {/* Left side - Logo only */}
         <div className="flex items-center">
           <Link href="/" className="flex items-center gap-2">
-            <img 
-              src="/images/logos/RankFi-Logo-White.png" 
-              alt="RankFi" 
-              className="h-7"
+            <Image
+              src="/images/logos/RankFi-Logo-White.png"
+              alt="RankFi"
+              width={120}
+              height={28}
+              className="h-7 w-auto"
+              priority
             />
           </Link>
         </div>

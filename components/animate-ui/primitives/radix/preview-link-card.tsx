@@ -140,9 +140,8 @@ function PreviewLinkCardContent({
 }: PreviewLinkCardContentProps) {
   const { href } = usePreviewLinkCard();
 
-  // Filter out asChild and other React-specific props that shouldn't be passed to DOM elements
-  // The HoverCardContentPrimitive handles asChild internally
-  const { asChild: _, ...domProps } = props;
+  // props already has asChild filtered out via destructuring in function signature
+  const domProps = props;
 
   return (
     <HoverCardContentPrimitive

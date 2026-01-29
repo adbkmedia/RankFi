@@ -1,6 +1,5 @@
 'use client';
 
-import Tooltip from './Tooltip';
 import TableTooltip from './TableTooltip';
 
 const topPicks = [
@@ -132,7 +131,7 @@ export default function TopPicksSection() {
                 id={`arrow-button-${idx}`}
               >
                     <svg
-                  className="w- h-5 text-gray-300 rotate-315"
+                  className="w-5 h-5 text-gray-300 rotate-315"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"

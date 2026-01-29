@@ -15,11 +15,12 @@ import {
   RowSelectionState,
   ColumnPinningState,
 } from '@tanstack/react-table';
-import { Dialog, Switch, TabGroup, TabList, Tab } from '@headlessui/react';
-import { Exchange } from '../../types/exchange';
-import { exchanges } from '../../data/exchanges';
+import { Switch } from '@headlessui/react';
+import { TableFilters, CompareDropdown, ColumnVisibilityModal, TablePagination } from './components';
+import { getExchanges, Exchange } from '../../data';
 import { formatCellValue, getPlaceholderColor, getSortComparison, calculateDiscountedFee } from '../../utils/tableHelpers';
 import { useHorizontalScroll } from '@/hooks/useHorizontalScroll';
+import { useClickOutside } from '@/hooks/useClickOutside';
 import IncidentBadge from '../IncidentBadge';
 import TableTooltip from '../TableTooltip';
 import { LinkPreviewCell } from '../LinkPreviewCell';
@@ -29,8 +30,6 @@ import {
   STICKY_SHADOW,
   FilterType,
   columnDefinitions,
-  regions,
-  filters,
   getExchangeRank,
 } from './constants';
 
@@ -104,6 +103,9 @@ const customSortingFn = (rowA: any, rowB: any, columnId: string) => {
 };
 
 export default function ComparisonTable() {
+  // Get exchange data (memoized - will be replaced with async fetch for Airtable)
+  const exchanges = useMemo(() => getExchanges(), []);
+
   const [activeFilter, setActiveFilter] = useState<FilterType>('features');
   const [sorting, setSorting] = useState<SortingState>([{ id: 'rank', desc: false }]);
   const [pagination, setPagination] = useState<PaginationState>({
@@ -135,37 +137,10 @@ export default function ComparisonTable() {
   
   const canScrollHorizontally = useHorizontalScroll(tableContainerRef);
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        compareDropdownRef.current &&
-        !compareDropdownRef.current.contains(event.target as Node)
-      ) {
-        setCompareDropdownOpen(false);
-      }
-      if (
-        regionDropdownRef.current &&
-        !regionDropdownRef.current.contains(event.target as Node)
-      ) {
-        setRegionDropdownOpen(false);
-      }
-      if (
-        mobileMenuRef.current &&
-        !mobileMenuRef.current.contains(event.target as Node)
-      ) {
-        setMobileMenuOpen(false);
-      }
-    };
-
-    if (compareDropdownOpen || regionDropdownOpen || mobileMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [compareDropdownOpen, regionDropdownOpen, mobileMenuOpen]);
+  // Close dropdowns when clicking outside
+  useClickOutside(compareDropdownRef, () => setCompareDropdownOpen(false), compareDropdownOpen);
+  useClickOutside(regionDropdownRef, () => setRegionDropdownOpen(false), regionDropdownOpen);
+  useClickOutside(mobileMenuRef, () => setMobileMenuOpen(false), mobileMenuOpen);
 
   // Build TanStack columns based on active filter
   const columns = useMemo<ColumnDef<Exchange>[]>(() => {
@@ -420,46 +395,12 @@ export default function ComparisonTable() {
     }
   };
 
-  const filteredExchangesForDropdown = table.getFilteredRowModel().rows.map(row => row.original);
-
-  const totalPages = table.getPageCount();
-  const currentPage = pagination.pageIndex + 1;
-  const startIndex = pagination.pageIndex * pagination.pageSize;
-  const endIndex = startIndex + pagination.pageSize;
+  // Memoize filtered exchanges for dropdown to prevent unnecessary recalculations
+  const filteredExchangesForDropdown = useMemo(
+    () => table.getFilteredRowModel().rows.map(row => row.original),
+    [table.getFilteredRowModel().rows]
+  );
   const totalRows = filteredExchanges.length;
-
-  const getPageNumbers = () => {
-    const pages: (number | string)[] = [];
-    const total = totalPages;
-    const current = currentPage;
-
-    if (total <= 7) {
-      for (let i = 1; i <= total; i++) {
-        pages.push(i);
-      }
-    } else {
-      pages.push(1);
-      const start = Math.max(2, current - 1);
-      const end = Math.min(total - 1, current + 1);
-      if (start > 2) pages.push('...');
-      for (let i = start; i <= end; i++) pages.push(i);
-      if (end < total - 1) pages.push('...');
-      pages.push(total);
-    }
-
-    return pages;
-  };
-
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      table.setPageIndex(page - 1);
-    }
-  };
-
-  const handleItemsPerPageChange = (value: number) => {
-    table.setPageSize(value);
-    table.setPageIndex(0);
-  };
 
   useEffect(() => {
     const container = tableContainerRef.current;
@@ -491,227 +432,40 @@ export default function ComparisonTable() {
     <div className="w-full max-w-7xl mx-auto px-4 py-4">
       {/* Filter Buttons and Compare */}
       <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
-        <div className="flex flex-wrap gap-3">
-          {/* Region Selector */}
-          <div className="relative" ref={regionDropdownRef}>
-            <button
-              onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
-              className="px-5 py-2 rounded-lg text-[13px] font-normal transition-colors cursor-pointer bg-[#f0f0f0] text-black hover:bg-[#e0e0e0]"
-            >
-              {regions.find(r => r.id === selectedRegion)?.label || '🌎 Global'}
-            </button>
-            
-            {regionDropdownOpen && (
-              <div
-                className="absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-md z-50"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {regions.map((region) => (
-                  <button
-                    key={region.id}
-                    onClick={() => {
-                      setSelectedRegion(region.id);
-                      setRegionDropdownOpen(false);
-                    }}
-                    className={`${
-                      selectedRegion === region.id ? 'bg-gray-100' : 'hover:bg-gray-50'
-                    } w-full text-left px-4 py-2 text-[13px] text-gray-700 transition-colors`}
-                  >
-                    {region.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          
-          {/* Desktop: Show all filter buttons */}
-          <div className="hidden md:flex">
-            <TabGroup 
-              selectedIndex={filters.findIndex(f => f.id === activeFilter)}
-              onChange={(index) => handleFilterChange(filters[index].id)}
-            >
-              <TabList className="bg-[#EFEFEF] rounded-lg px-1 py-0.5 gap-0.5 flex">
-                {filters.map((filter) => (
-                  <Tab
-                    key={filter.id}
-                    className={({ selected }) =>
-                      `px-5 rounded-md text-[13px] font-medium transition-all focus:outline-none focus:ring-0 ${
-                        selected
-                          ? 'bg-white text-black shadow-sm py-[5px]'
-                          : 'text-gray-600 hover:text-gray-800 py-1.5'
-                      }`
-                    }
-                  >
-                    {filter.label}
-                  </Tab>
-                ))}
-              </TabList>
-            </TabGroup>
-          </div>
-          
-          {/* Mobile: Show dropdown */}
-          <div className="relative md:hidden" ref={mobileMenuRef}>
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="px-5 py-2 rounded-lg text-[13px] font-normal transition-colors cursor-pointer bg-[#f0f0f0] text-black hover:bg-[#e0e0e0] flex items-center gap-2"
-              style={{
-                backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")",
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'right 12px center',
-                backgroundSize: '16px',
-                paddingRight: '32px',
-              }}
-            >
-              {filters.find(f => f.id === activeFilter)?.label || 'Features'}
-            </button>
-            
-            {mobileMenuOpen && (
-              <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-md z-50">
-                {filters.map((filter) => (
-                  <button
-                    key={filter.id}
-                    onClick={() => {
-                      handleFilterChange(filter.id);
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`${
-                      activeFilter === filter.id ? 'bg-gray-100' : 'hover:bg-gray-50'
-                    } w-full text-left px-4 py-2 text-[13px] text-gray-700 transition-colors flex items-center gap-2`}
-                  >
-                    {activeFilter === filter.id && <span>✓</span>}
-                    {filter.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        <TableFilters
+          activeFilter={activeFilter}
+          onFilterChange={handleFilterChange}
+          selectedRegion={selectedRegion}
+          setSelectedRegion={setSelectedRegion}
+          regionDropdownOpen={regionDropdownOpen}
+          setRegionDropdownOpen={setRegionDropdownOpen}
+          mobileMenuOpen={mobileMenuOpen}
+          setMobileMenuOpen={setMobileMenuOpen}
+          regionDropdownRef={regionDropdownRef}
+          mobileMenuRef={mobileMenuRef}
+        />
 
-        <div className="flex items-center gap-2">
-          {/* Column Visibility Button */}
-          <button
-            onClick={() => setColumnVisibilityModalOpen(true)}
-            className="px-3 py-2 rounded-lg text-[13px] font-normal transition-colors cursor-pointer bg-[#f0f0f0] text-black hover:bg-[#e0e0e0]"
-            title="Column Visibility"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-            </svg>
-          </button>
-
-          {/* Compare Button */}
-          <div className="relative" ref={compareDropdownRef}>
-            <button
-              onClick={handleCompareButtonClick}
-              className={`px-5 py-2 rounded-lg text-[13px] font-normal transition-colors cursor-pointer flex items-center gap-2 ${
-                comparisonApplied
-                  ? 'bg-[#2d2d2d] text-white'
-                  : 'bg-[#f0f0f0] text-black hover:bg-[#e0e0e0]'
-              }`}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              {comparisonApplied ? 'Clear Filter' : 'Compare'}
-              {Object.values(rowSelection).filter(Boolean).length > 0 && (
-                <span className="ml-1">({Object.values(rowSelection).filter(Boolean).length})</span>
-              )}
-            </button>
-
-            {compareDropdownOpen && !comparisonApplied && (
-              <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-[#eaeaea] rounded-lg shadow-lg z-50 p-4" onClick={(e) => e.stopPropagation()}>
-                <input
-                  type="text"
-                  placeholder="Search exchanges..."
-                  value={globalFilter}
-                  onChange={(e) => setGlobalFilter(e.target.value)}
-                  className="w-full px-3 py-2 mb-3 border border-[#eaeaea] rounded text-[13px] focus:outline-none focus:ring-2 focus:ring-[#00a38f]"
-                />
-                <div className="max-h-60 overflow-y-auto mb-3">
-                  {filteredExchangesForDropdown.map((exchange) => {
-                    const isSelected = rowSelection[exchange.app_name] === true;
-                    const selectedCount = Object.values(rowSelection).filter(Boolean).length;
-                    return (
-                      <div
-                        key={exchange.app_name}
-                        className="flex items-center gap-2 py-2 hover:bg-gray-50 cursor-pointer"
-                        onClick={() => handleExchangeToggle(exchange.app_name)}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => handleExchangeToggle(exchange.app_name)}
-                          disabled={!isSelected && selectedCount >= 7}
-                          className="cursor-pointer"
-                        />
-                        <span className="text-[13px] text-gray-900 flex-1">{exchange.app_name}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-                <button
-                  onClick={handleApplyComparison}
-                  disabled={Object.values(rowSelection).filter(Boolean).length === 0}
-                  className="w-full px-4 py-2 bg-[#2d2d2d] text-white rounded text-[13px] font-medium hover:bg-[#3a3a3a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Apply ({Object.values(rowSelection).filter(Boolean).length}/7)
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+        <CompareDropdown
+          comparisonApplied={comparisonApplied}
+          compareDropdownOpen={compareDropdownOpen}
+          rowSelection={rowSelection}
+          globalFilter={globalFilter}
+          setGlobalFilter={setGlobalFilter}
+          onCompareButtonClick={handleCompareButtonClick}
+          onExchangeToggle={handleExchangeToggle}
+          onApplyComparison={handleApplyComparison}
+          filteredExchanges={filteredExchangesForDropdown}
+          compareDropdownRef={compareDropdownRef}
+          onOpenColumnVisibilityModal={() => setColumnVisibilityModalOpen(true)}
+        />
       </div>
 
       {/* Column Visibility Modal */}
-      <Dialog open={columnVisibilityModalOpen} onClose={() => setColumnVisibilityModalOpen(false)} className="relative z-50">
-        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
-        <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <Dialog.Title className="text-lg font-semibold mb-4">Column Visibility</Dialog.Title>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {table.getAllColumns()
-                .filter(column => column.getCanHide() && column.id !== 'app_name' && column.id !== 'website')
-                .map((column) => (
-                  <label key={column.id} className="flex items-center gap-2 py-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={column.getIsVisible()}
-                      onChange={() => column.toggleVisibility()}
-                      className="cursor-pointer"
-                    />
-                    <span className="text-[13px] text-gray-900">
-                      {column.id === 'rank' 
-                        ? 'Ranking'
-                        : typeof column.columnDef.header === 'string' 
-                        ? column.columnDef.header 
-                        : column.id}
-                    </span>
-                  </label>
-                ))}
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                onClick={() => {
-                  table.getAllColumns().forEach(col => {
-                    if (col.getCanHide() && col.id !== 'app_name' && col.id !== 'website') {
-                      col.toggleVisibility(true);
-                    }
-                  });
-                }}
-                className="px-4 py-2 text-[13px] text-gray-700 hover:bg-gray-100 rounded transition-colors"
-              >
-                Show All
-              </button>
-              <button
-                onClick={() => setColumnVisibilityModalOpen(false)}
-                className="px-4 py-2 bg-[#2d2d2d] text-white rounded text-[13px] font-medium hover:bg-[#3a3a3a] transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </Dialog.Panel>
-        </div>
-      </Dialog>
+      <ColumnVisibilityModal
+        open={columnVisibilityModalOpen}
+        onClose={() => setColumnVisibilityModalOpen(false)}
+        table={table}
+      />
 
       {/* Table */}
       <div className="bg-white rounded overflow-hidden">
@@ -892,60 +646,11 @@ export default function ComparisonTable() {
 
       {/* Pagination Footer */}
       {!comparisonApplied && (
-        <div className="flex justify-between items-center mt-4 px-2 flex-wrap gap-4">
-          <div className="text-[13px] text-gray-600">
-            Showing {startIndex + 1} - {Math.min(endIndex, totalRows)} out of {totalRows}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-              className="px-2 py-1 border border-[#eaeaea] bg-white rounded text-[12px] text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              ←
-            </button>
-            <div className="flex items-center gap-1">
-              {getPageNumbers().map((page, idx) => {
-                if (page === '...') {
-                  return <span key={`ellipsis-${idx}`} className="px-1 text-gray-500 text-[12px]">...</span>;
-                }
-                const pageNum = page as number;
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => handlePageChange(pageNum)}
-                    className={`px-2 py-1 border border-[#eaeaea] rounded text-[12px] transition-colors ${
-                      currentPage === pageNum
-                        ? 'bg-[#2d2d2d] text-white border-[#2d2d2d]'
-                        : 'bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-              className="px-2 py-1 border border-[#eaeaea] bg-white rounded text-[12px] text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              →
-            </button>
-          </div>
-          <div className="flex items-center gap-2 text-[13px] text-gray-600">
-            <span>Show</span>
-            <select
-              value={pagination.pageSize}
-              onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
-              className="px-2 py-1.5 border border-[#eaeaea] rounded bg-white text-[13px] text-gray-700 cursor-pointer"
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-            </select>
-          </div>
-        </div>
+        <TablePagination
+          table={table}
+          pagination={pagination}
+          totalRows={totalRows}
+        />
       )}
     </div>
   );
