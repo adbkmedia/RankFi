@@ -14,6 +14,7 @@ import {
   VisibilityState,
   RowSelectionState,
   ColumnPinningState,
+  Row,
 } from '@tanstack/react-table';
 import { Switch } from '@headlessui/react';
 import { TableFilters, CompareDropdown, ColumnVisibilityModal, TablePagination } from './components';
@@ -32,6 +33,7 @@ import {
   columnDefinitions,
   getExchangeRank,
 } from './constants';
+import { Z_INDEX } from '../../constants/zIndex';
 
 // Helper to render name cell with logo
 const renderNameCell = (exchange: Exchange) => {
@@ -47,6 +49,7 @@ const renderNameCell = (exchange: Exchange) => {
         href={`/cex/${exchange.app_name.toLowerCase().replace(/\s+/g, '-')}/`}
         className="text-black font-bold hover:underline truncate block whitespace-nowrap"
         style={{ maxWidth: 'calc(175px - 30px)' }}
+        title={exchange.app_name}
       >
         {exchange.app_name}
       </a>
@@ -71,7 +74,7 @@ const ToggleSwitch = ({
         onChange={onChange}
         disabled={disabled}
         className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white ${
-          enabled ? 'bg-[#00a38f]' : 'bg-gray-300'
+          enabled ? 'bg-rankfi-teal' : 'bg-gray-300'
         } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
         <span className="sr-only">Toggle discount</span>
@@ -86,7 +89,7 @@ const ToggleSwitch = ({
 };
 
 // Custom sorting function for rank
-const rankSortingFn = (rowA: any, rowB: any, columnId: string) => {
+const rankSortingFn = (rowA: Row<Exchange>, rowB: Row<Exchange>, _columnId: string) => {
   const rankA = getExchangeRank(rowA.original.app_name);
   const rankB = getExchangeRank(rowB.original.app_name);
   if (rankA < rankB) return -1;
@@ -95,9 +98,9 @@ const rankSortingFn = (rowA: any, rowB: any, columnId: string) => {
 };
 
 // Custom sorting function using existing helper
-const customSortingFn = (rowA: any, rowB: any, columnId: string) => {
-  const exchangeA = rowA.original as Exchange;
-  const exchangeB = rowB.original as Exchange;
+const customSortingFn = (rowA: Row<Exchange>, rowB: Row<Exchange>, columnId: string) => {
+  const exchangeA = rowA.original;
+  const exchangeB = rowB.original;
   const sortComparison = getSortComparison(columnId, 'asc');
   return sortComparison(exchangeA, exchangeB);
 };
@@ -132,7 +135,7 @@ export default function ComparisonTable() {
   const [discountToggleEnabled, setDiscountToggleEnabled] = useState(false);
   
   const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({
-    left: ['rank', 'app_name'],
+    left: ['rank', 'app_name', 'sticky_shadow'],
   });
   
   const canScrollHorizontally = useHorizontalScroll(tableContainerRef);
@@ -161,6 +164,20 @@ export default function ComparisonTable() {
         maxSize: COLUMN_WIDTHS.rank,
       },
     ];
+
+    // Add shadow column after sticky columns (will be inserted after app_name)
+    // This column has 0 width - the shadow is rendered via absolute positioning
+    const shadowColumn: ColumnDef<Exchange> = {
+      id: 'sticky_shadow',
+      header: () => null,
+      enableSorting: false,
+      enableHiding: false,
+      enablePinning: true,
+      cell: () => null,
+      size: 0,
+      minSize: 0,
+      maxSize: 0,
+    };
 
     const filterColumns = columnDefinitions[activeFilter];
     
@@ -199,7 +216,6 @@ export default function ComparisonTable() {
                     content="This discount applies to trading fees when enabled via the toggle."
                     position="bottom"
                     variant="default"
-                    zIndex={9999}
                   >
                     <svg
                       className="w-4 h-4 text-gray-400 cursor-help"
@@ -219,15 +235,27 @@ export default function ComparisonTable() {
             );
           } else if (isFeeColumn) {
             const originalFee = formatCellValue(exchange[col.key as keyof Exchange]);
-            if (discountToggleEnabled && exchange.rankfi_discount) {
-              const discountedFee = calculateDiscountedFee(originalFee, exchange.rankfi_discount);
-              return (
-                <div className="text-center">
-                  <span>{discountedFee}</span>
-                </div>
-              );
-            }
-            return <div className="text-center">{originalFee}</div>;
+            const displayFee = discountToggleEnabled && exchange.rankfi_discount
+              ? calculateDiscountedFee(originalFee, exchange.rankfi_discount)
+              : originalFee;
+            const isSpotFeeColumn = ['maker_fee', 'taker_fee'].includes(col.key);
+
+            return (
+              <div className="text-center flex items-center justify-center gap-1">
+                <span>{displayFee}</span>
+                {exchange.uses_spread_fee && isSpotFeeColumn && (
+                  <TableTooltip
+                    content="This exchange uses spread-based pricing instead of fixed fees. Spread fees are typically higher and vary based on market conditions."
+                    position="top"
+                    variant="default"
+                  >
+                    <span className="inline-flex items-center justify-center w-[15px] h-[15px] bg-red-500 text-white text-[10px] font-bold rounded cursor-help">
+                      S
+                    </span>
+                  </TableTooltip>
+                )}
+              </div>
+            );
           } else if (isHacksColumn) {
             return (
               <div className="text-center">
@@ -279,19 +307,28 @@ export default function ComparisonTable() {
               return <div className="text-center">{value}</div>;
             }
           } else {
-            const hasTruncation = (col as any).maxSize && !['uses_cold_storage', 'publicly_traded'].includes(col.key);
+            const hasTruncation = col.maxSize && !['uses_cold_storage', 'publicly_traded'].includes(col.key);
+            const cellValue = formatCellValue(exchange[col.key as keyof Exchange]);
             return (
-              <div className={`text-center ${hasTruncation ? 'truncate overflow-hidden text-ellipsis whitespace-nowrap' : ''}`}>
-                {formatCellValue(exchange[col.key as keyof Exchange])}
+              <div
+                className={`text-center ${hasTruncation ? 'truncate overflow-hidden text-ellipsis whitespace-nowrap' : ''}`}
+                title={hasTruncation ? cellValue : undefined}
+              >
+                {cellValue}
               </div>
             );
           }
         },
-        size: (col as any).size || (isNameColumn ? COLUMN_WIDTHS.name : undefined),
-        minSize: (col as any).minSize || (isNameColumn ? COLUMN_WIDTHS.name : undefined),
-        maxSize: (col as any).maxSize || (isNameColumn ? COLUMN_WIDTHS.name : undefined),
+        size: col.size || (isNameColumn ? COLUMN_WIDTHS.name : undefined),
+        minSize: col.minSize || (isNameColumn ? COLUMN_WIDTHS.name : undefined),
+        maxSize: col.maxSize || (isNameColumn ? COLUMN_WIDTHS.name : undefined),
       };
       baseColumns.push(columnDef);
+
+      // Insert shadow column right after the name column
+      if (isNameColumn) {
+        baseColumns.push(shadowColumn);
+      }
     });
 
     baseColumns.push({
@@ -327,7 +364,8 @@ export default function ComparisonTable() {
 
   const handleFilterChange = (filter: FilterType) => {
     setActiveFilter(filter);
-    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+    // Don't reset pagination - keep user on same page
+    // Clamping to max page is handled by TanStack Table automatically
   };
 
   const table = useReactTable({
@@ -468,15 +506,16 @@ export default function ComparisonTable() {
       />
 
       {/* Table */}
-      <div className="bg-white rounded overflow-hidden">
+      <div className="bg-white rounded-none sm:rounded overflow-hidden -mx-4 sm:mx-0">
         <div ref={tableContainerRef} className="overflow-x-auto" style={{ paddingLeft: 0, marginLeft: 0 }}>
           <table className="w-full" style={{ marginLeft: 0, paddingLeft: 0, borderCollapse: 'separate', borderSpacing: 0 }}>
-            <thead className="sticky top-0 z-40" style={{ height: `${HEADER_HEIGHT}px`, display: 'table-header-group' }}>
+            <thead className="sticky top-0" style={{ height: `${HEADER_HEIGHT}px`, display: 'table-header-group', zIndex: Z_INDEX.tableHeader }}>
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id} className="bg-[#2d2d2d]" style={{ height: `${HEADER_HEIGHT}px`, display: 'table-row', boxSizing: 'border-box' }}>
                   {headerGroup.headers.map((header) => {
                     const isRankColumn = header.id === 'rank';
                     const isNameColumn = header.id === 'app_name';
+                    const isShadowColumn = header.id === 'sticky_shadow';
                     const isHacksColumn = header.id === 'hacks_or_incidents';
                     const isIncidentsColumn = header.id === 'other_incidents';
                     const isWrappableColumn = ['uses_cold_storage', 'publicly_traded'].includes(header.id);
@@ -484,12 +523,56 @@ export default function ComparisonTable() {
                     const sortDirection = header.column.getIsSorted();
                     const isPinned = header.column.getIsPinned();
                     const pinnedIndex = header.column.getPinnedIndex();
-                    
+
+                    // Shadow column - renders as continuous vertical shadow indicator
+                    if (isShadowColumn) {
+                      return (
+                        <th
+                          key={header.id}
+                          className="p-0 border-0"
+                          style={{
+                            position: 'sticky',
+                            left: `${COLUMN_WIDTHS.stickyTotal}px`,
+                            width: 0,
+                            minWidth: 0,
+                            maxWidth: 0,
+                            padding: 0,
+                            zIndex: Z_INDEX.stickyColumnName + 1,
+                            overflow: 'visible',
+                          }}
+                        >
+                          {canScrollHorizontally && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                bottom: 0,
+                                left: 0,
+                                width: '8px',
+                                background: 'linear-gradient(to right, rgba(0,0,0,0.08), rgba(0,0,0,0.02) 50%, transparent)',
+                                pointerEvents: 'none',
+                              }}
+                            />
+                          )}
+                        </th>
+                      );
+                    }
+
+                    // Custom sort handler: only toggle between asc and desc (no unsorted state)
+                    const handleSort = canSort ? () => {
+                      const currentSort = header.column.getIsSorted();
+                      if (currentSort === 'asc') {
+                        header.column.toggleSorting(true); // set to desc
+                      } else {
+                        header.column.toggleSorting(false); // set to asc
+                      }
+                    } : undefined;
+
                     return (
                       <th
                         key={header.id}
                         data-column-id={header.id}
-                        onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
+                        onClick={handleSort}
                         className={`text-xs font-medium text-white tracking-wider border-b border-gray-700 align-middle ${
                           canSort ? 'cursor-pointer hover:bg-[#3a3a3a]' : ''
                         } transition-colors relative ${
@@ -512,8 +595,7 @@ export default function ComparisonTable() {
                           ...(isPinned === 'left' && {
                             position: 'sticky',
                             left: pinnedIndex === 0 ? 0 : pinnedIndex === 1 ? `${COLUMN_WIDTHS.rank}px` : undefined,
-                            zIndex: isRankColumn ? 30 : isNameColumn ? 20 : 10,
-                            boxShadow: isNameColumn && canScrollHorizontally ? STICKY_SHADOW : 'none',
+                            zIndex: isRankColumn ? Z_INDEX.stickyColumnRank : isNameColumn ? Z_INDEX.stickyColumnName : Z_INDEX.stickyColumn,
                           }),
                           ...(isRankColumn && {
                             width: `${COLUMN_WIDTHS.rank}px`,
@@ -547,7 +629,7 @@ export default function ComparisonTable() {
                       >
                         <div className={`flex items-center ${isNameColumn ? 'justify-start' : 'justify-center'} relative w-full`}>
                           {canSort && (
-                            <span 
+                            <span
                               className="text-[#999] absolute"
                               style={{ fontSize: '7px', opacity: sortDirection ? 1 : 0, left: '-4px', top: '50%', transform: 'translateY(-50%)' }}
                             >
@@ -570,11 +652,46 @@ export default function ComparisonTable() {
                   {row.getVisibleCells().map((cell) => {
                     const isRankColumn = cell.column.id === 'rank';
                     const isNameColumn = cell.column.id === 'app_name';
+                    const isShadowColumn = cell.column.id === 'sticky_shadow';
                     const isHacksColumn = cell.column.id === 'hacks_or_incidents';
                     const isIncidentsColumn = cell.column.id === 'other_incidents';
                     const isWrappableColumn = ['uses_cold_storage', 'publicly_traded'].includes(cell.column.id);
                     const isPinned = cell.column.getIsPinned();
                     const pinnedIndex = cell.column.getPinnedIndex();
+
+                    // Shadow column - renders as continuous vertical shadow indicator
+                    if (isShadowColumn) {
+                      return (
+                        <td
+                          key={cell.id}
+                          className="p-0 border-0"
+                          style={{
+                            position: 'sticky',
+                            left: `${COLUMN_WIDTHS.stickyTotal}px`,
+                            width: 0,
+                            minWidth: 0,
+                            maxWidth: 0,
+                            padding: 0,
+                            zIndex: Z_INDEX.stickyColumnBody + 1,
+                            overflow: 'visible',
+                          }}
+                        >
+                          {canScrollHorizontally && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                bottom: 0,
+                                left: 0,
+                                width: '8px',
+                                background: 'linear-gradient(to right, rgba(0,0,0,0.08), rgba(0,0,0,0.02) 50%, transparent)',
+                                pointerEvents: 'none',
+                              }}
+                            />
+                          )}
+                        </td>
+                      );
+                    }
                     
                     return (
                       <td
@@ -593,8 +710,7 @@ export default function ComparisonTable() {
                           ...(isPinned === 'left' && {
                             position: 'sticky',
                             left: pinnedIndex === 0 ? 0 : pinnedIndex === 1 ? `${COLUMN_WIDTHS.rank}px` : undefined,
-                            zIndex: isRankColumn ? 20 : isNameColumn ? 10 : 5,
-                            boxShadow: isNameColumn && canScrollHorizontally ? STICKY_SHADOW : 'none',
+                            zIndex: isRankColumn ? Z_INDEX.stickyColumnBodyRank : isNameColumn ? Z_INDEX.stickyColumnBodyName : Z_INDEX.stickyColumnBody,
                           }),
                           ...(isRankColumn && {
                             width: `${COLUMN_WIDTHS.rank}px`,

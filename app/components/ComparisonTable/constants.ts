@@ -12,8 +12,17 @@ export const STICKY_SHADOW = '6px 0 8px -4px rgba(0,0,0,0.15)';
 
 export type FilterType = 'features' | 'fees' | 'security';
 
+// Column definition type
+export interface ColumnDefinition {
+  key: string;
+  label: string;
+  size?: number;
+  minSize?: number;
+  maxSize?: number;
+}
+
 // Column definitions matching your live site
-export const columnDefinitions = {
+export const columnDefinitions: Record<FilterType, ColumnDefinition[]> = {
   features: [
     { key: 'app_name', label: 'Name' },
     { key: 'coins', label: '# of Coins' },

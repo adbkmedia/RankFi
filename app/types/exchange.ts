@@ -21,6 +21,7 @@ export type Exchange = {
   futures_taker_fee?: string;
   rankfi_discount?: string;
   rankfi_bonus?: string;
+  uses_spread_fee?: boolean;
   // Security
   founded?: number | string;
   number_of_users?: number | string;

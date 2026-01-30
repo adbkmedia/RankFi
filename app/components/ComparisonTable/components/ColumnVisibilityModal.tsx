@@ -23,7 +23,7 @@ export function ColumnVisibilityModal({
           <Dialog.Title className="text-lg font-semibold mb-4">Column Visibility</Dialog.Title>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {table.getAllColumns()
-              .filter(column => column.getCanHide() && column.id !== 'app_name' && column.id !== 'website')
+              .filter(column => column.getCanHide() && column.id !== 'rank' && column.id !== 'app_name' && column.id !== 'website')
               .map((column) => (
                 <label key={column.id} className="flex items-center gap-2 py-2 cursor-pointer">
                   <input
@@ -46,7 +46,7 @@ export function ColumnVisibilityModal({
             <button
               onClick={() => {
                 table.getAllColumns().forEach(col => {
-                  if (col.getCanHide() && col.id !== 'app_name' && col.id !== 'website') {
+                  if (col.getCanHide() && col.id !== 'rank' && col.id !== 'app_name' && col.id !== 'website') {
                     col.toggleVisibility(true);
                   }
                 });
