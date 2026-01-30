@@ -7,6 +7,7 @@ export type Exchange = {
   number_of_futures?: number | string;
   max_leverage?: number | string;
   fiat_currencies?: number | string;
+  supported_fiat_currencies?: string[]; // e.g., ['USD', 'EUR', 'GBP']
   margin_spot?: number | string;
   copy_trading?: boolean | string;
   trading_bots?: boolean | string;

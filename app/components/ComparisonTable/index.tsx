@@ -23,7 +23,10 @@ import { formatCellValue, getPlaceholderColor, getSortComparison, calculateDisco
 import { useHorizontalScroll } from '@/hooks/useHorizontalScroll';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import IncidentBadge from '../IncidentBadge';
+import StatusBadge from '../StatusBadge';
+import CheckIcon from '../CheckIcon';
 import TableTooltip from '../TableTooltip';
+import FiatCurrencyTooltip from '../FiatCurrencyTooltip';
 import { LinkPreviewCell } from '../LinkPreviewCell';
 import {
   COLUMN_WIDTHS,
@@ -187,8 +190,21 @@ export default function ComparisonTable() {
       const isIncidentsColumn = col.key === 'other_incidents';
       const isProofOfReservesColumn = col.key === 'proof_of_reserves';
       const isInsurancePolicyColumn = col.key === 'insurance_policy';
+      const isCheckmarkColumn = [
+        'copy_trading',
+        'trading_bots',
+        'p2p_trading',
+        'staking_or_earn',
+        'mobile_app',
+        '247_support',
+        'uses_cold_storage',
+        'publicly_traded',
+        '2fa',
+      ].includes(col.key);
+      const isKycColumn = col.key === 'kyc';
       const isDiscountColumn = col.key === 'rankfi_discount';
       const isFeeColumn = ['maker_fee', 'taker_fee', 'futures_maker_fee', 'futures_taker_fee'].includes(col.key);
+      const isFiatCurrenciesColumn = col.key === 'fiat_currencies';
       const columnDef: ColumnDef<Exchange> = {
         id: col.key,
         accessorKey: col.key,
@@ -278,25 +294,34 @@ export default function ComparisonTable() {
             );
           } else if (isProofOfReservesColumn) {
             const rawValue = exchange.proof_of_reserves;
-            const value = formatCellValue(rawValue);
             const url = exchange.proof_of_reserves_url;
-            const shouldBeLink = (rawValue === true || rawValue === 'Yes') && url;
-            
-            if (shouldBeLink) {
-              return (
-                <div className="text-center">
-                  <LinkPreviewCell url={url} label={value} />
-                </div>
-              );
-            } else {
-              return <div className="text-center">{value}</div>;
+            return (
+              <div className="text-center">
+                <StatusBadge value={rawValue} url={url} />
+              </div>
+            );
+          } else if (isCheckmarkColumn) {
+            const rawValue = exchange[col.key as keyof Exchange];
+            return (
+              <div className="text-center">
+                <CheckIcon value={rawValue as boolean | string | undefined} />
+              </div>
+            );
+          } else if (isKycColumn) {
+            const rawValue = exchange.kyc;
+            let displayValue = formatCellValue(rawValue);
+            // Convert "Yes" to "Required"
+            if (displayValue === 'Yes' || displayValue === 'yes') {
+              displayValue = 'Required';
             }
+            return <div className="text-center">{displayValue}</div>;
           } else if (isInsurancePolicyColumn) {
             const rawValue = exchange.insurance_policy;
-            const value = formatCellValue(rawValue);
+            const isNo = rawValue === false || rawValue === 'No' || rawValue === 'no';
+            const value = isNo ? '$0' : formatCellValue(rawValue);
             const url = exchange.insurance_policy_url;
-            const shouldBeLink = (rawValue !== false && rawValue !== 'No' && rawValue !== 'no') && url;
-            
+            const shouldBeLink = !isNo && url;
+
             if (shouldBeLink) {
               return (
                 <div className="text-center">
@@ -306,8 +331,34 @@ export default function ComparisonTable() {
             } else {
               return <div className="text-center">{value}</div>;
             }
+          } else if (isFiatCurrenciesColumn) {
+            const count = formatCellValue(exchange.fiat_currencies);
+            const currencies = exchange.supported_fiat_currencies || [];
+            const numericCount = parseInt(String(exchange.fiat_currencies).replace(/\D/g, '')) || 0;
+            const showTooltip = currencies.length > 0 && numericCount > 0;
+            return (
+              <div className="text-center flex items-center justify-center gap-1">
+                <span>{count}</span>
+                {showTooltip && (
+                  <FiatCurrencyTooltip currencies={currencies} position="bottom">
+                    <svg
+                      className="w-4 h-4 text-gray-400 cursor-help"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                      aria-hidden="true"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </FiatCurrencyTooltip>
+                )}
+              </div>
+            );
           } else {
-            const hasTruncation = col.maxSize && !['uses_cold_storage', 'publicly_traded'].includes(col.key);
+            const hasTruncation = col.maxSize;
             const cellValue = formatCellValue(exchange[col.key as keyof Exchange]);
             return (
               <div
@@ -364,6 +415,7 @@ export default function ComparisonTable() {
 
   const handleFilterChange = (filter: FilterType) => {
     setActiveFilter(filter);
+    setSorting([{ id: 'rank', desc: false }]); // Reset to default sorting to avoid referencing non-existent columns
     // Don't reset pagination - keep user on same page
     // Clamping to max page is handled by TanStack Table automatically
   };
@@ -518,7 +570,10 @@ export default function ComparisonTable() {
                     const isShadowColumn = header.id === 'sticky_shadow';
                     const isHacksColumn = header.id === 'hacks_or_incidents';
                     const isIncidentsColumn = header.id === 'other_incidents';
+                    const isFiatWalletsColumn = header.id === 'fiat_currencies';
+                    const isInsuranceHeaderColumn = header.id === 'insurance_policy';
                     const isWrappableColumn = ['uses_cold_storage', 'publicly_traded'].includes(header.id);
+                    const needsHeaderTooltip = isHacksColumn || isIncidentsColumn || isFiatWalletsColumn || isInsuranceHeaderColumn;
                     const canSort = header.column.getCanSort();
                     const sortDirection = header.column.getIsSorted();
                     const isPinned = header.column.getIsPinned();
@@ -639,6 +694,35 @@ export default function ComparisonTable() {
                           <span className={isNameColumn ? 'text-left pl-4' : 'text-center w-full'}>
                             {flexRender(header.column.columnDef.header, header.getContext())}
                           </span>
+                          {needsHeaderTooltip && (
+                            <TableTooltip
+                              content={
+                                isHacksColumn
+                                  ? "Platforms that experienced a security breach resulting in loss of user funds."
+                                  : isIncidentsColumn
+                                  ? "Other incidents such as data breaches, lawsuits, or regulatory issues not involving loss of user funds."
+                                  : isInsuranceHeaderColumn
+                                  ? "Insurance fund or policy in place to protect users in case of a platform hack or loss of funds."
+                                  : "Native fiat wallets for depositing and withdrawing traditional currencies. This excludes instant buy features that only convert fiat to crypto without actual fiat trading pairs or wallet functionality."
+                              }
+                              position="bottom"
+                              variant="default"
+                            >
+                              <svg
+                                className="w-3.5 h-3.5 text-gray-400 cursor-help ml-1 shrink-0"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                                aria-hidden="true"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            </TableTooltip>
+                          )}
                         </div>
                       </th>
                     );
