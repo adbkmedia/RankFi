@@ -6,6 +6,7 @@ import {
   PreviewLinkCardContent,
   PreviewLinkCardImage,
 } from '@/components/animate-ui/components/radix/preview-link-card';
+import { Z_INDEX } from '../constants/zIndex';
 
 interface LinkPreviewCellProps {
   url: string;
@@ -22,7 +23,7 @@ export const LinkPreviewCell = ({ url, label }: LinkPreviewCellProps) => (
     <PreviewLinkCardTrigger
       target="_blank"
       rel="noopener noreferrer"
-      className="text-[#00a38f] hover:underline"
+      className="text-rankfi-teal hover:underline"
     >
       {label}
     </PreviewLinkCardTrigger>
@@ -31,7 +32,7 @@ export const LinkPreviewCell = ({ url, label }: LinkPreviewCellProps) => (
       align="center" 
       sideOffset={8}
       className="p-0 bg-white border border-gray-200 shadow-xl max-w-xs overflow-hidden"
-      style={{ zIndex: 99999 }}
+      style={{ zIndex: Z_INDEX.previewCard }}
     >
       <div className="relative">
         <PreviewLinkCardImage 

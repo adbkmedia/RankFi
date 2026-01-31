@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { FilterButtonConfig } from '../config/filterButtons';
 
 interface FilterButtonProps {
   label: string;

@@ -4,8 +4,8 @@ export interface ValidationIssue {
   exchange: string;
   field: string;
   issue: string;
-  currentValue: any;
-  suggestedValue?: any;
+  currentValue: Exchange[keyof Exchange];
+  suggestedValue?: Exchange[keyof Exchange];
   severity: 'error' | 'warning' | 'info';
 }
 
@@ -57,7 +57,7 @@ const floatColumns = [
 const requiredFields = ['app_name', 'website'];
 
 // Check if value is a valid boolean format
-const isValidBooleanFormat = (value: any): boolean => {
+const isValidBooleanFormat = (value: Exchange[keyof Exchange]): boolean => {
   if (typeof value === 'boolean') return true;
   if (typeof value === 'string') {
     const lower = value.toLowerCase().trim();
@@ -67,7 +67,7 @@ const isValidBooleanFormat = (value: any): boolean => {
 };
 
 // Check if value is a valid integer
-const isValidInteger = (value: any): boolean => {
+const isValidInteger = (value: Exchange[keyof Exchange]): boolean => {
   if (typeof value === 'number' && Number.isInteger(value)) return true;
   if (typeof value === 'string') {
     // Allow formats like "300+", "1M", "1B", "1K"
@@ -78,7 +78,7 @@ const isValidInteger = (value: any): boolean => {
 };
 
 // Check if value is a valid float
-const isValidFloat = (value: any): boolean => {
+const isValidFloat = (value: Exchange[keyof Exchange]): boolean => {
   if (typeof value === 'number') return true;
   if (typeof value === 'string') {
     // Allow formats like "0.10%", "0.10% to 0.20%"
@@ -89,7 +89,7 @@ const isValidFloat = (value: any): boolean => {
 };
 
 // Normalize boolean value
-const normalizeBoolean = (value: any): boolean | string => {
+const normalizeBoolean = (value: Exchange[keyof Exchange]): boolean | Exchange[keyof Exchange] => {
   if (typeof value === 'boolean') return value;
   if (typeof value === 'string') {
     const lower = value.toLowerCase().trim();

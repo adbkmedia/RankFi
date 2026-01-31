@@ -10,7 +10,11 @@ export const COLUMN_WIDTHS = {
 export const HEADER_HEIGHT = 60;
 export const STICKY_SHADOW = '6px 0 8px -4px rgba(0,0,0,0.15)';
 
-export type FilterType = 'features' | 'fees' | 'security';
+// Preset filter types (have predefined column sets)
+export type PresetFilterType = 'features' | 'fees' | 'security';
+
+// All filter types including custom
+export type FilterType = PresetFilterType | 'custom';
 
 // Column definition type
 export interface ColumnDefinition {
@@ -21,8 +25,8 @@ export interface ColumnDefinition {
   maxSize?: number;
 }
 
-// Column definitions matching your live site
-export const columnDefinitions: Record<FilterType, ColumnDefinition[]> = {
+// Column definitions matching your live site (only for preset filters)
+export const columnDefinitions: Record<PresetFilterType, ColumnDefinition[]> = {
   features: [
     { key: 'app_name', label: 'Name' },
     { key: 'coins', label: '# of Coins' },
@@ -67,11 +71,48 @@ export const regions = [
   { id: 'canada', label: '🇨🇦 Canada', url: '' },
 ];
 
-export const filters = [
-  { id: 'features' as FilterType, label: 'Features' },
-  { id: 'fees' as FilterType, label: 'Fees' },
-  { id: 'security' as FilterType, label: 'Security' },
+// Preset filters (shown as regular tabs)
+export const presetFilters: { id: PresetFilterType; label: string }[] = [
+  { id: 'features', label: 'Features' },
+  { id: 'fees', label: 'Fees' },
+  { id: 'security', label: 'Security' },
 ];
+
+// All filters including custom
+export const filters: { id: FilterType; label: string }[] = [
+  ...presetFilters,
+  { id: 'custom', label: '+ Custom' },
+];
+
+// Helper to get all unique columns across all categories (excluding app_name)
+export const getAllColumnDefinitions = (): { category: PresetFilterType; columns: ColumnDefinition[] }[] => {
+  return presetFilters.map(filter => ({
+    category: filter.id,
+    columns: columnDefinitions[filter.id].filter(col => col.key !== 'app_name'),
+  }));
+};
+
+// Helper to get a flat list of all unique column keys
+export const getAllColumnKeys = (): string[] => {
+  const allKeys = new Set<string>();
+  presetFilters.forEach(filter => {
+    columnDefinitions[filter.id].forEach(col => {
+      if (col.key !== 'app_name') {
+        allKeys.add(col.key);
+      }
+    });
+  });
+  return Array.from(allKeys);
+};
+
+// Helper to find a column definition by key
+export const getColumnDefinitionByKey = (key: string): ColumnDefinition | undefined => {
+  for (const filter of presetFilters) {
+    const col = columnDefinitions[filter.id].find(c => c.key === key);
+    if (col) return col;
+  }
+  return undefined;
+};
 
 // Rank assignment function - placeholder ranks
 export const getExchangeRank = (exchangeName: string): number => {

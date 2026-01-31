@@ -19,7 +19,7 @@ export const getPlaceholderColor = (exchangeName: string): string => {
 };
 
 // Check if value is missing/N/A
-const isValueMissing = (value: any): boolean => {
+const isValueMissing = (value: Exchange[keyof Exchange]): boolean => {
   return value === null || value === undefined || value === '' || value === 'N/A';
 };
 
@@ -60,7 +60,7 @@ export const getSortComparison = (
     const intColumns = ['coins', 'number_of_futures', 'max_leverage', 'margin_spot', 'founded', 'fiat_currencies'];
     if (intColumns.includes(column)) {
       // Parse integer values with support for "300+", "1M", "1B", "1K" formats
-      const parseIntValue = (val: any): number => {
+      const parseIntValue = (val: Exchange[keyof Exchange]): number => {
         if (typeof val === 'number') return val;
         const str = String(val).trim();
         
@@ -105,7 +105,7 @@ export const getSortComparison = (
     // Boolean columns - handle both actual booleans and Yes/No strings
     const boolColumns = ['copy_trading', 'trading_bots', 'p2p_trading', 'staking_or_earn', 'mobile_app', '247_support', 'proof_of_reserves', 'uses_cold_storage', 'insurance_policy', '2fa', 'kyc', 'publicly_traded'];
     if (boolColumns.includes(column)) {
-      const parseBoolean = (val: any): boolean => {
+      const parseBoolean = (val: Exchange[keyof Exchange]): boolean => {
         if (typeof val === 'boolean') return val;
         const str = String(val).toLowerCase().trim();
         return str === 'yes' || str === 'true' || str === '1';

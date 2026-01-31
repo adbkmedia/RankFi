@@ -17,7 +17,7 @@ export default function HeroSection({
   activeButton,
 }: HeroSectionProps) {
   return (
-    <div 
+    <div
       className="relative overflow-hidden"
       style={{
         backgroundImage: 'url(/images/logos/RG-BG-Green-Block.jpg)',

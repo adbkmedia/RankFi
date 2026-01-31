@@ -37,27 +37,29 @@ export function CompareDropdown({
     <div className="flex items-center gap-2">
       {/* Column Visibility Button */}
       <button
+        type="button"
         onClick={onOpenColumnVisibilityModal}
         className="px-3 py-2 rounded-lg text-[13px] font-normal transition-colors cursor-pointer bg-[#f0f0f0] text-black hover:bg-[#e0e0e0]"
         title="Column Visibility"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 4v16M12 4v16M18 4v16" />
         </svg>
       </button>
 
       {/* Compare Button */}
       <div className="relative" ref={compareDropdownRef}>
         <button
+          type="button"
           onClick={onCompareButtonClick}
-          className={`px-5 py-2 rounded-lg text-[13px] font-normal transition-colors cursor-pointer flex items-center gap-2 ${
+          className={`px-5 py-2 rounded-lg text-[13px] font-normal transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
             comparisonApplied
               ? 'bg-[#2d2d2d] text-white'
               : 'bg-[#f0f0f0] text-black hover:bg-[#e0e0e0]'
           }`}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
           </svg>
           {comparisonApplied ? 'Clear Filter' : 'Compare'}
           {selectedCount > 0 && (
@@ -66,13 +68,13 @@ export function CompareDropdown({
         </button>
 
         {compareDropdownOpen && !comparisonApplied && (
-          <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-[#eaeaea] rounded-lg shadow-lg z-50 p-4" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-[#eaeaea] rounded-lg shadow-lg z-[100] p-4" onClick={(e) => e.stopPropagation()}>
             <input
               type="text"
               placeholder="Search exchanges..."
               value={globalFilter}
               onChange={(e) => setGlobalFilter(e.target.value)}
-              className="w-full px-3 py-2 mb-3 border border-[#eaeaea] rounded text-[13px] focus:outline-none focus:ring-2 focus:ring-[#00a38f]"
+              className="w-full px-3 py-2 mb-3 border border-[#eaeaea] rounded text-[13px] focus:outline-none focus:ring-2 focus:ring-rankfi-teal"
             />
             <div className="max-h-60 overflow-y-auto mb-3">
               {filteredExchanges.map((exchange) => {
@@ -96,6 +98,7 @@ export function CompareDropdown({
               })}
             </div>
             <button
+              type="button"
               onClick={onApplyComparison}
               disabled={selectedCount === 0}
               className="w-full px-4 py-2 bg-[#2d2d2d] text-white rounded text-[13px] font-medium hover:bg-[#3a3a3a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"

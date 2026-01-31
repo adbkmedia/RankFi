@@ -33,8 +33,11 @@ import {
   HEADER_HEIGHT,
   STICKY_SHADOW,
   FilterType,
+  PresetFilterType,
   columnDefinitions,
   getExchangeRank,
+  getColumnDefinitionByKey,
+  getAllColumnDefinitions,
 } from './constants';
 import { Z_INDEX } from '../../constants/zIndex';
 
@@ -136,7 +139,10 @@ export default function ComparisonTable() {
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   
   const [discountToggleEnabled, setDiscountToggleEnabled] = useState(false);
-  
+
+  // Custom view columns (when user selects "+ Custom" tab)
+  const [customViewColumns, setCustomViewColumns] = useState<string[]>([]);
+
   const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({
     left: ['rank', 'app_name', 'sticky_shadow'],
   });
@@ -147,6 +153,7 @@ export default function ComparisonTable() {
   useClickOutside(compareDropdownRef, () => setCompareDropdownOpen(false), compareDropdownOpen);
   useClickOutside(regionDropdownRef, () => setRegionDropdownOpen(false), regionDropdownOpen);
   useClickOutside(mobileMenuRef, () => setMobileMenuOpen(false), mobileMenuOpen);
+
 
   // Build TanStack columns based on active filter
   const columns = useMemo<ColumnDef<Exchange>[]>(() => {
@@ -182,7 +189,14 @@ export default function ComparisonTable() {
       maxSize: 0,
     };
 
-    const filterColumns = columnDefinitions[activeFilter];
+    // For custom filter, build columns from selected custom columns
+    // For preset filters, use the predefined column definitions
+    const filterColumns = activeFilter === 'custom'
+      ? [
+          { key: 'app_name', label: 'Name' }, // Always include name
+          ...customViewColumns.map(key => getColumnDefinitionByKey(key)).filter(Boolean) as typeof columnDefinitions.features,
+        ]
+      : columnDefinitions[activeFilter];
     
     filterColumns.forEach((col) => {
       const isNameColumn = col.key === 'app_name';
@@ -401,7 +415,7 @@ export default function ComparisonTable() {
     });
 
     return baseColumns;
-  }, [activeFilter, discountToggleEnabled]);
+  }, [activeFilter, discountToggleEnabled, customViewColumns]);
 
   const filteredExchanges = useMemo(() => {
     if (comparisonApplied && Object.keys(rowSelection).length > 0) {
@@ -418,6 +432,11 @@ export default function ComparisonTable() {
     setSorting([{ id: 'rank', desc: false }]); // Reset to default sorting to avoid referencing non-existent columns
     // Don't reset pagination - keep user on same page
     // Clamping to max page is handled by TanStack Table automatically
+
+    // Auto-open modal when Custom tab is clicked
+    if (filter === 'custom') {
+      setColumnVisibilityModalOpen(true);
+    }
   };
 
   const table = useReactTable({
@@ -521,7 +540,7 @@ export default function ComparisonTable() {
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-4">
       {/* Filter Buttons and Compare */}
-      <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
+      <div className="relative z-[45] flex flex-wrap items-center gap-1.5 md:gap-2 md:justify-between mb-4">
         <TableFilters
           activeFilter={activeFilter}
           onFilterChange={handleFilterChange}
@@ -533,6 +552,8 @@ export default function ComparisonTable() {
           setMobileMenuOpen={setMobileMenuOpen}
           regionDropdownRef={regionDropdownRef}
           mobileMenuRef={mobileMenuRef}
+          customViewColumnsCount={customViewColumns.length}
+          onCustomEditClick={() => setColumnVisibilityModalOpen(true)}
         />
 
         <CompareDropdown
@@ -554,7 +575,12 @@ export default function ComparisonTable() {
       <ColumnVisibilityModal
         open={columnVisibilityModalOpen}
         onClose={() => setColumnVisibilityModalOpen(false)}
-        table={table}
+        columnVisibility={columnVisibility}
+        setColumnVisibility={setColumnVisibility}
+        activeFilter={activeFilter}
+        customViewColumns={customViewColumns}
+        setCustomViewColumns={setCustomViewColumns}
+        isCustomMode={activeFilter === 'custom'}
       />
 
       {/* Table */}

@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
 import {
   PreviewLinkCard,
   PreviewLinkCardTrigger,
   PreviewLinkCardContent,
   PreviewLinkCardImage,
 } from '@/components/animate-ui/components/radix/preview-link-card';
+import { Z_INDEX } from '../constants/zIndex';
 
 interface IncidentBadgeProps {
   value: string;
@@ -112,7 +112,7 @@ function PreviewLinkCardWrapper({
         align="center" 
         sideOffset={8}
         className="p-0 bg-white border border-gray-200 shadow-xl max-w-xs overflow-hidden"
-        style={{ zIndex: 99999 }}
+        style={{ zIndex: Z_INDEX.previewCard }}
       >
         <div className="relative">
           <PreviewLinkCardImage 

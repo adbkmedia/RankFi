@@ -3,6 +3,7 @@
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import Link from 'next/link';
 import { ReactNode } from 'react';
+import { Z_INDEX } from '../constants/zIndex';
 
 /**
  * TableTooltip component for displaying tooltips inside table cells.
@@ -14,7 +15,7 @@ import { ReactNode } from 'react';
  * @param content - Main tooltip text content
  * @param linkText - Optional link text to display below content
  * @param linkUrl - Optional URL for the link
- * @param zIndex - Z-index for tooltip (default: 9999 to appear above table)
+ * @param zIndex - Z-index for tooltip (default: Z_INDEX.tooltip to appear above table)
  */
 interface TableTooltipProps {
   children: ReactNode;
@@ -32,7 +33,7 @@ const variantStyles = {
     bg: 'bg-gray-900',
     text: 'text-white',
     arrow: 'fill-gray-900',
-    link: 'text-[#00a38f] hover:underline',
+    link: 'text-rankfi-teal hover:underline',
   },
   info: {
     bg: 'bg-blue-50',
@@ -56,7 +57,7 @@ export default function TableTooltip({
   position = 'top',
   align = 'center',
   variant = 'default',
-  zIndex = 9999,
+  zIndex = Z_INDEX.tooltip,
 }: TableTooltipProps) {
   const styles = variantStyles[variant];
 
@@ -69,11 +70,12 @@ export default function TableTooltip({
         <TooltipPrimitive.Portal>
           <TooltipPrimitive.Content
             side={position}
-            sideOffset={8}
+            sideOffset={5}
             align={align}
             alignOffset={0}
             collisionPadding={8}
             avoidCollisions={true}
+            arrowPadding={8}
             className={`${styles.bg} ${styles.text} text-xs rounded-lg shadow-xl px-3 py-3 max-w-[256px]`}
             style={{ zIndex }}
           >
@@ -95,7 +97,7 @@ export default function TableTooltip({
                 </Link>
               </div>
             )}
-            <TooltipPrimitive.Arrow className={styles.arrow} width={8} height={8} />
+            <TooltipPrimitive.Arrow className={styles.arrow} width={10} height={6} />
           </TooltipPrimitive.Content>
         </TooltipPrimitive.Portal>
       </TooltipPrimitive.Root>

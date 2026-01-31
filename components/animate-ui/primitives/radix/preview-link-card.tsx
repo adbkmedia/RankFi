@@ -118,7 +118,7 @@ function buildQueryString(
 }
 
 type PreviewLinkCardContentProps = HoverCardContentPropsPrimitive &
-  React.ComponentProps<'a'>;
+  React.ComponentProps<'div'>;
 
 function PreviewLinkCardContent({
   side = 'top',
@@ -134,12 +134,9 @@ function PreviewLinkCardContent({
   transition = { type: 'spring', stiffness: 300, damping: 25 },
   asChild,
   children,
-  href: hrefProp,
   style,
   ...props
 }: PreviewLinkCardContentProps) {
-  const { href } = usePreviewLinkCard();
-
   // props already has asChild filtered out via destructuring in function signature
   const domProps = props;
 
@@ -161,18 +158,16 @@ function PreviewLinkCardContent({
       {asChild ? (
         children
       ) : (
-        <a
+        <div
           style={{
             display: 'block',
-            zIndex: 99999,
             position: 'relative',
             ...style,
           }}
-          href={hrefProp ?? href}
           {...domProps}
         >
           {children}
-        </a>
+        </div>
       )}
     </HoverCardContentPrimitive>
   );

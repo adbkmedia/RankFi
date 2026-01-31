@@ -365,10 +365,10 @@ export default function Header() {
       {/* Mobile menu */}
       <div
         className={`lg:hidden overflow-hidden transition-all duration-300 ${
-          mobileMenuOpen ? "max-h-[800px] opacity-100" : "max-h-0 opacity-0"
+          mobileMenuOpen ? "max-h-[calc(100vh-72px)] opacity-100 pointer-events-auto" : "max-h-0 opacity-0 pointer-events-none"
         }`}
       >
-        <div className="space-y-1 px-6 pb-6 pt-2 bg-black/95 backdrop-blur-xl border-t border-white/15">
+        <div className="space-y-1 px-6 pb-6 pt-2 bg-black/95 backdrop-blur-xl border-t border-white/15 max-h-[calc(100vh-72px)] overflow-y-auto">
           {/* Products section */}
           <div className="py-2">
             <p className={mobileSectionHeaderClass}>Products</p>

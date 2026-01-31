@@ -38,7 +38,6 @@ export default function TopPicksSection() {
               position="bottom"
               align="start"
               variant="default"
-              zIndex={9999}
             >
               <button
                 className="w-3.5 h-3.5 rounded-full bg-gray-400 text-white text-xs flex items-center justify-center hover:bg-gray-500 transition-colors cursor-help"
@@ -51,7 +50,7 @@ export default function TopPicksSection() {
           <div className="flex items-center gap-2">
             <a
               href="/terms-of-service/"
-              className="text-[#00a38f] hover:underline text-sm"
+              className="text-rankfi-teal hover:underline text-sm"
             >
               Affiliate Disclosure
             </a>
@@ -62,7 +61,6 @@ export default function TopPicksSection() {
               position="bottom"
               align="end"
               variant="default"
-              zIndex={9999}
             >
               <button
                 className="w-3.5 h-3.5 rounded-full bg-gray-400 text-white text-xs flex items-center justify-center hover:bg-gray-500 transition-colors cursor-help"
